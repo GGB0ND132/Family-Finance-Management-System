@@ -1,4 +1,4 @@
-import { DeleteOutlined, PlusOutlined, SwapOutlined } from "@ant-design/icons";
+import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 import dayjs, { type Dayjs } from "dayjs";
 import {
   Button,
@@ -17,7 +17,9 @@ import {
 } from "antd";
 import type { TableColumnsType } from "antd";
 import { useState } from "react";
-import { formatCurrency, type FinanceTransfer } from "../data/financeData";
+import { currentUserId, formatCurrency, formatDateTime, type FinanceTransfer } from "../data/financeData";
+import { ScopeToggle } from "../components/ScopeToggle";
+import { useDataScope } from "../hooks/useDataScope";
 import { useFinanceStore } from "../stores/financeStore";
 import { accountLabel, memberLabel } from "./pageUtils";
 interface TransferForm {
@@ -31,6 +33,7 @@ export function TransfersPage() {
   const [open, setOpen] = useState(false);
   const [form] = Form.useForm<TransferForm>();
   const [api, holder] = message.useMessage();
+  const [scope] = useDataScope();
   const { transfers, accounts, members, addTransfer, deleteTransfer } =
     useFinanceStore();
   const active = accounts.filter((a) => !a.closedAt);
@@ -49,14 +52,14 @@ export function TransfersPage() {
       toMemberId: to.ownerMemberId,
       recorderUserId: "member-zhang",
       amount: v.amount,
-      occurredAt: v.occurredAt.format("YYYY-MM-DD"),
+      occurredAt: v.occurredAt.format("YYYY-MM-DDTHH:mm:00Z"),
       remark: v.remark?.trim() || "账户转账",
     });
     api.success("转账已保存，未计入收支统计");
     setOpen(false);
   };
   const columns: TableColumnsType<FinanceTransfer> = [
-    { title: "日期", dataIndex: "occurredAt" },
+    { title: "发生时间", render: (_, t) => formatDateTime(t.occurredAt) },
     {
       title: "转出账户",
       render: (_, t) => (
@@ -66,7 +69,6 @@ export function TransfersPage() {
         </span>
       ),
     },
-    { title: "方向", render: () => <SwapOutlined /> },
     {
       title: "转入账户",
       render: (_, t) => (
@@ -108,7 +110,9 @@ export function TransfersPage() {
             转账只改变账户余额，不会改变收入、支出、结余或预算使用。
           </Typography.Text>
         </div>
-        <Button
+        <Space>
+          <ScopeToggle />
+          <Button
           type="primary"
           icon={<PlusOutlined />}
           onClick={() => {
@@ -118,13 +122,14 @@ export function TransfersPage() {
           }}
         >
           新增转账
-        </Button>
+          </Button>
+        </Space>
       </div>
-      <Card className="data-card" title={`转账记录 · ${transfers.length} 笔`}>
+      <Card className="data-card" title={`转账记录 · ${transfers.filter((t) => scope === 'family' || t.fromMemberId === currentUserId || t.toMemberId === currentUserId).length} 笔`}>
         <Table
           rowKey="id"
           columns={columns}
-          dataSource={transfers}
+          dataSource={transfers.filter((t) => scope === 'family' || t.fromMemberId === currentUserId || t.toMemberId === currentUserId)}
           pagination={{ pageSize: 8 }}
           scroll={{ x: 900 }}
         />
@@ -185,11 +190,11 @@ export function TransfersPage() {
             />
           </Form.Item>
           <Form.Item
-            label="发生日期"
+            label="发生时间"
             name="occurredAt"
             rules={[{ required: true }]}
           >
-            <DatePicker className="full-width" />
+            <DatePicker showTime={{ format: 'HH:mm' }} format="YYYY-MM-DD HH:mm" className="full-width" />
           </Form.Item>
           <Form.Item label="备注" name="remark">
             <Input.TextArea rows={3} />

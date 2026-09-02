@@ -1,182 +1,23 @@
-import { CopyOutlined, SaveOutlined } from "@ant-design/icons";
-import dayjs, { type Dayjs } from "dayjs";
-import {
-  Alert,
-  Button,
-  Card,
-  DatePicker,
-  Empty,
-  InputNumber,
-  Progress,
-  Space,
-  Tag,
-  Typography,
-  message,
-} from "antd";
-import { useMemo, useState } from "react";
-import { categories, demoMonth, formatCurrency } from "../data/financeData";
-import { useFinanceStore } from "../stores/financeStore";
+import { CopyOutlined, DeleteOutlined, PlusOutlined, SaveOutlined } from '@ant-design/icons'
+import dayjs, { type Dayjs } from 'dayjs'
+import { Alert, Button, Card, DatePicker, Empty, InputNumber, Progress, Select, Space, Tag, Typography, message } from 'antd'
+import { useEffect, useMemo, useState } from 'react'
+import { categories, currentUserId, demoMonth, formatCurrency } from '../data/financeData'
+import { ScopeToggle } from '../components/ScopeToggle'
+import { useDataScope } from '../hooks/useDataScope'
+import { useFinanceStore } from '../stores/financeStore'
 
 export function BudgetsPage() {
-  const [month, setMonth] = useState(demoMonth);
-  const [total, setTotal] = useState(0);
-  const [items, setItems] = useState<Record<string, number>>({});
-  const [api, holder] = message.useMessage();
-  const { budgets, transactions, saveBudget, copyBudget } = useFinanceStore();
-  const budget = budgets.find((b) => b.month === month);
-  const expenseByCategory = useMemo(
-    () =>
-      Object.fromEntries(
-        categories.map((c) => [
-          c.id,
-          transactions
-            .filter(
-              (t) =>
-                t.type === "EXPENSE" &&
-                t.categoryId === c.id &&
-                t.occurredAt.startsWith(month),
-            )
-            .reduce((s, t) => s + t.amount, 0),
-        ]),
-      ),
-    [month, transactions],
-  );
-  const currentTotal = budget?.totalAmount ?? total;
-  const currentItems = budget
-    ? Object.fromEntries(budget.items.map((i) => [i.categoryId, i.amount]))
-    : items;
-  const used = transactions
-    .filter((t) => t.type === "EXPENSE" && t.occurredAt.startsWith(month))
-    .reduce((s, t) => s + t.amount, 0);
-  const percent = currentTotal ? Math.round((used / currentTotal) * 100) : 0;
-  const save = () => {
-    saveBudget(
-      month,
-      currentTotal,
-      categories
-        .filter((c) => c.type === "EXPENSE" && !c.deletedAt)
-        .map((c) => ({ categoryId: c.id, amount: currentItems[c.id] ?? 0 }))
-        .filter((i) => i.amount > 0),
-    );
-    api.success("预算已保存");
-  };
-  const changeMonth = (v: Dayjs | null) => {
-    if (v) {
-      setMonth(v.format("YYYY-MM"));
-      const b = budgets.find((x) => x.month === v.format("YYYY-MM"));
-      setTotal(b?.totalAmount ?? 0);
-      setItems(
-        Object.fromEntries(
-          (b?.items ?? []).map((i) => [i.categoryId, i.amount]),
-        ),
-      );
-    }
-  };
-  return (
-    <div className="page">
-      {holder}
-      <div className="page-heading">
-        <div>
-          <Typography.Title level={2}>月度预算</Typography.Title>
-          <Typography.Text>
-            按月维护总预算和分类预算，支出超过 80% 进入预警。
-          </Typography.Text>
-        </div>
-        <Space>
-          <DatePicker
-            picker="month"
-            value={dayjs(month)}
-            onChange={changeMonth}
-            allowClear={false}
-          />
-          <Button
-            icon={<CopyOutlined />}
-            onClick={() => {
-              copyBudget(month);
-              api.success("已复制上月预算");
-            }}
-          >
-            复制上月
-          </Button>
-          <Button type="primary" icon={<SaveOutlined />} onClick={save}>
-            保存预算
-          </Button>
-        </Space>
-      </div>
-      <Card className="data-card" title="月度总预算">
-        <Space align="center">
-          <InputNumber
-            min={0}
-            precision={2}
-            value={currentTotal}
-            onChange={(v) => setTotal(v ?? 0)}
-            addonBefore="¥"
-          />
-          <span>已支出 {formatCurrency(used)}</span>
-          <Progress
-            percent={Math.min(percent, 100)}
-            status={
-              percent > 100 ? "exception" : percent >= 80 ? "active" : "normal"
-            }
-          />
-        </Space>
-        {percent >= 80 && (
-          <Alert
-            className="budget-alert"
-            showIcon
-            type={percent > 100 ? "error" : "warning"}
-            message={percent > 100 ? "总预算已超支" : "预算使用达到预警线"}
-          />
-        )}
-      </Card>
-      <Card className="data-card" title="分类预算">
-        <div className="budget-list">
-          {categories
-            .filter((c) => c.type === "EXPENSE" && !c.deletedAt)
-            .map((c) => {
-              const limit = currentItems[c.id] ?? 0;
-              const actual = expenseByCategory[c.id] ?? 0;
-              const p = limit ? Math.round((actual / limit) * 100) : 0;
-              return (
-                <div className="budget-item" key={c.id}>
-                  <div className="budget-item__heading">
-                    <Space>
-                      <span
-                        className="category-dot category-dot--large"
-                        style={{ background: c.color }}
-                      />
-                      <div>
-                        <strong>{c.name}</strong>
-                        <span>本月支出 {formatCurrency(actual)}</span>
-                      </div>
-                    </Space>
-                    <InputNumber
-                      min={0}
-                      precision={2}
-                      value={limit}
-                      onChange={(v) =>
-                        setItems((old) => ({ ...old, [c.id]: v ?? 0 }))
-                      }
-                      addonBefore="¥"
-                    />
-                  </div>
-                  <div className="budget-item__progress">
-                    <Progress
-                      percent={Math.min(p, 100)}
-                      status={
-                        p > 100 ? "exception" : p >= 80 ? "active" : "normal"
-                      }
-                    />
-                    <Tag color={p > 100 ? "red" : p >= 80 ? "gold" : "green"}>
-                      {p > 100 ? "超支" : p >= 80 ? "预警" : "正常"}
-                    </Tag>
-                  </div>
-                </div>
-              );
-            })}
-        </div>
-      </Card>
-      {!budget && !total && <Empty description="当前月份尚未设置预算" />}
-    </div>
-  );
+  const [scope] = useDataScope(); const [month, setMonth] = useState(demoMonth); const [total, setTotal] = useState(0); const [items, setItems] = useState<Record<string, number>>({}); const [api, holder] = message.useMessage(); const { budgets, transactions, saveBudget, copyBudget } = useFinanceStore()
+  const budget = budgets.find((b) => b.month === month && b.scope === scope && (scope === 'family' || b.memberId === currentUserId)); const currentItems = items; const currentTotal = total
+  const budgetItemsKey = budget?.items.map((i) => `${i.categoryId}:${i.amount}`).join('|') ?? ''
+  useEffect(() => { setTotal(budget?.totalAmount ?? 0); setItems(Object.fromEntries((budget?.items ?? []).map((i) => [i.categoryId, i.amount]))) }, [budget?.month, budget?.scope, budget?.memberId, budget?.totalAmount, budgetItemsKey])
+  const expenseCategories = categories.filter((c) => c.type === 'EXPENSE' && !c.deletedAt); const selectedIds = Object.keys(currentItems); const available = expenseCategories.filter((c) => !selectedIds.includes(c.id))
+  const expenseByCategory = useMemo(() => Object.fromEntries(expenseCategories.map((c) => [c.id, transactions.filter((t) => t.type === 'EXPENSE' && t.categoryId === c.id && t.occurredAt.startsWith(month) && (scope === 'family' || t.beneficiaryMemberId === currentUserId)).reduce((s, t) => s + t.amount, 0)])), [expenseCategories, month, scope, transactions]); const used = Object.values(expenseByCategory).reduce((s, n) => s + n, 0); const percent = currentTotal ? Math.round((used / currentTotal) * 100) : 0
+  const changeMonth = (v: Dayjs | null) => { if (!v) return; const next = v.format('YYYY-MM'); setMonth(next); const b = budgets.find((x) => x.month === next && x.scope === scope && (scope === 'family' || x.memberId === currentUserId)); setTotal(b?.totalAmount ?? 0); setItems(Object.fromEntries((b?.items ?? []).map((i) => [i.categoryId, i.amount]))) }
+  const save = () => { saveBudget(scope, month, currentTotal, Object.entries(currentItems).map(([categoryId, amount]) => ({ categoryId, amount })), scope === 'personal' ? currentUserId : undefined); api.success('预算已保存') }
+  return <div className="page">{holder}<div className="page-heading"><div><Typography.Title level={2}>月度预算</Typography.Title><Typography.Text>按范围和月份维护预算。个人预算缺省为 ¥0，分类按需添加。</Typography.Text></div><Space><ScopeToggle /><DatePicker picker="month" value={dayjs(month)} onChange={changeMonth} allowClear={false} /><Button icon={<CopyOutlined />} onClick={() => { copyBudget(scope, month, scope === 'personal' ? currentUserId : undefined); api.success('已复制上月预算') }}>复制上月</Button><Button type="primary" icon={<SaveOutlined />} onClick={save}>保存预算</Button></Space></div>
+    <Card className="data-card" title="月度总预算"><Space align="center" wrap><InputNumber min={0} precision={2} value={currentTotal} onChange={(v) => setTotal(v ?? 0)} addonBefore="¥" /><span>已支出 {formatCurrency(used)}</span><Progress percent={Math.min(percent, 100)} status={percent > 100 ? 'exception' : percent >= 80 ? 'active' : 'normal'} /></Space>{percent >= 80 && <Alert className="budget-alert" showIcon type={percent > 100 ? 'error' : 'warning'} message={percent > 100 ? '总预算已超支' : '预算使用达到预警线'} />}</Card>
+    <Card className="data-card" title="分类预算" extra={<Select placeholder="添加预算分类" value={undefined} onChange={(id: string) => setItems((old) => ({ ...old, [id]: 0 }))} options={available.map((c) => ({ value: c.id, label: `${c.icon} ${c.name}` }))} suffixIcon={<PlusOutlined />} style={{ width: 180 }} />}>{selectedIds.length === 0 ? <Empty description="当前月份暂无分类预算，使用右侧添加分类" /> : <div className="budget-list">{selectedIds.map((id) => { const c = expenseCategories.find((x) => x.id === id); if (!c) return null; const limit = currentItems[id] ?? 0; const actual = expenseByCategory[id] ?? 0; const p = limit ? Math.round((actual / limit) * 100) : 0; return <div className="budget-item" key={id}><div className="budget-item__heading"><Space><span className="category-dot category-dot--large" style={{ background: c.color }} /><div><strong>{c.name}</strong><span>本月支出 {formatCurrency(actual)}</span></div></Space><Space><InputNumber min={0} precision={2} value={limit} onChange={(v) => setItems((old) => ({ ...old, [id]: v ?? 0 }))} addonBefore="¥" /><Button type="text" danger icon={<DeleteOutlined />} aria-label={`移除${c.name}`} onClick={() => setItems((old) => { const next = { ...old }; delete next[id]; return next })} /></Space></div><div className="budget-item__progress"><Progress percent={Math.min(p, 100)} status={p > 100 ? 'exception' : p >= 80 ? 'active' : 'normal'} /><Tag color={p > 100 ? 'red' : p >= 80 ? 'gold' : 'green'}>{p > 100 ? '超支' : p >= 80 ? '预警' : '正常'}</Tag></div></div> })}</div>}</Card>
+  </div>
 }

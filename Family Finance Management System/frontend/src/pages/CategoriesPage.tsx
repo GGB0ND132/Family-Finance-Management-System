@@ -16,6 +16,7 @@ import type { TableColumnsType } from "antd";
 import { useState } from "react";
 import { useFinanceStore } from "../stores/financeStore";
 import type { Category, CategoryType } from "../data/financeData";
+import { ScopeToggle } from "../components/ScopeToggle";
 type CategoryForm = {
   name: string;
   type: CategoryType;
@@ -102,7 +103,7 @@ export function CategoriesPage() {
             按收入和支出分组。被历史流水引用的分类会保留名称，但不能用于新记录。
           </Typography.Text>
         </div>
-        <Button
+        <Space><ScopeToggle /><Button
           type="primary"
           icon={<PlusOutlined />}
           onClick={() => {
@@ -113,7 +114,7 @@ export function CategoriesPage() {
           }}
         >
           新增分类
-        </Button>
+        </Button></Space>
       </div>
       <Card className="filter-card" bordered={false}>
         <Segmented

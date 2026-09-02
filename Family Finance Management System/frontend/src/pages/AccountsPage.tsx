@@ -22,6 +22,9 @@ import {
 } from "antd";
 import { useState } from "react";
 import { formatCurrency, type AccountType } from "../data/financeData";
+import { currentUserId } from "../data/financeData";
+import { ScopeToggle } from "../components/ScopeToggle";
+import { useDataScope } from "../hooks/useDataScope";
 import { useFinanceStore } from "../stores/financeStore";
 import { memberLabel } from "./pageUtils";
 
@@ -39,6 +42,7 @@ export function AccountsPage() {
   const [editing, setEditing] = useState<string>();
   const [form] = Form.useForm();
   const [api, holder] = message.useMessage();
+  const [scope] = useDataScope();
   const { accounts, members, addAccount, updateAccount, removeOrCloseAccount } =
     useFinanceStore();
   const save = (v: {
@@ -68,7 +72,7 @@ export function AccountsPage() {
             按成员查看账户。销户账户不再进入当前资产和记账选择器。
           </Typography.Text>
         </div>
-        <Button
+        <Space><ScopeToggle /><Button
           type="primary"
           icon={<PlusOutlined />}
           onClick={() => {
@@ -78,7 +82,7 @@ export function AccountsPage() {
           }}
         >
           新增账户
-        </Button>
+        </Button></Space>
       </div>
       <Row gutter={[16, 16]}>
         {members.map((m) => (
@@ -95,7 +99,7 @@ export function AccountsPage() {
             >
               <Space direction="vertical" className="full-width">
                 {accounts
-                  .filter((a) => a.ownerMemberId === m.id)
+                  .filter((a) => a.ownerMemberId === m.id && (scope === 'family' || m.id === currentUserId))
                   .map((a) => (
                     <div className="report-category-row" key={a.id}>
                       <Space>
@@ -126,9 +130,7 @@ export function AccountsPage() {
                           description="有历史引用的账户会保留并标记为已销户。"
                           onConfirm={() => {
                             const result = removeOrCloseAccount(a.id);
-                            api.success(
-                              result === "CLOSED" ? "账户已销户" : "账户已删除",
-                            );
+                            api[result === 'BALANCE_NOT_ZERO' ? 'error' : 'success'](result === 'BALANCE_NOT_ZERO' ? '账户余额不为 0，请先转出资金' : result === "CLOSED" ? "账户已销户" : "账户已删除");
                           }}
                         >
                           <Button

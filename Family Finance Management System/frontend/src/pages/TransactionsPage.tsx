@@ -24,12 +24,9 @@ import {
 } from "antd";
 import type { TableColumnsType } from "antd";
 import { useMemo, useState } from "react";
-import {
-  demoFamilyId,
-  formatCurrency,
-  type CategoryType,
-  type FinanceTransaction,
-} from "../data/financeData";
+import { demoFamilyId, formatCurrency, formatDateTime, currentUserId, type CategoryType, type FinanceTransaction } from "../data/financeData";
+import { ScopeToggle } from "../components/ScopeToggle";
+import { useDataScope } from "../hooks/useDataScope";
 import { useFinanceStore } from "../stores/financeStore";
 import {
   accountLabel,
@@ -64,6 +61,7 @@ export function TransactionsPage() {
     min?: number;
     max?: number;
   }>({});
+  const [scope] = useDataScope();
   const {
     transactions,
     accounts,
@@ -81,7 +79,7 @@ export function TransactionsPage() {
       transactions.filter((t) => {
         const a = accounts.find((x) => x.id === t.accountId);
         const f = filters;
-        return (
+        return ((scope === 'family' || t.beneficiaryMemberId === currentUserId) &&
           (!f.type || t.type === f.type) &&
           (!f.accountId || t.accountId === f.accountId) &&
           (!f.ownerMemberId || a?.ownerMemberId === f.ownerMemberId) &&
@@ -90,14 +88,14 @@ export function TransactionsPage() {
             t.beneficiaryMemberId === f.beneficiaryMemberId) &&
           (!f.recorderUserId || t.recorderUserId === f.recorderUserId) &&
           (!f.dates ||
-            ((!f.dates[0] || t.occurredAt >= f.dates[0].format("YYYY-MM-DD")) &&
+            ((!f.dates[0] || t.occurredAt >= f.dates[0].startOf('day').toISOString()) &&
               (!f.dates[1] ||
-                t.occurredAt <= f.dates[1].format("YYYY-MM-DD")))) &&
+                t.occurredAt <= f.dates[1].endOf('day').toISOString()))) &&
           (f.min == null || t.amount >= f.min) &&
           (f.max == null || t.amount <= f.max)
         );
       }),
-    [accounts, filters, transactions],
+    [accounts, filters, scope, transactions],
   );
   const clear = () => setFilters({});
   const openCreate = () => {
@@ -118,7 +116,7 @@ export function TransactionsPage() {
   const save = (v: FormValues) => {
     const draft = {
       ...v,
-      occurredAt: v.occurredAt.format("YYYY-MM-DD"),
+      occurredAt: v.occurredAt.format("YYYY-MM-DDTHH:mm:00Z"),
       remark: v.remark?.trim() || "未填写备注",
       recorderUserId: "member-zhang",
     };
@@ -128,7 +126,7 @@ export function TransactionsPage() {
     setOpen(false);
   };
   const columns: TableColumnsType<FinanceTransaction> = [
-    { title: "日期", dataIndex: "occurredAt", width: 112 },
+    { title: "发生时间", render: (_, t) => formatDateTime(t.occurredAt), width: 160 },
     { title: "类型", render: (_, t) => typeTag(t.type) },
     { title: "账户", render: (_, t) => accountLabel(t.accountId, accounts) },
     {
@@ -201,6 +199,7 @@ export function TransactionsPage() {
           </Typography.Text>
         </div>
         <Space>
+          <ScopeToggle />
           <Button
             icon={<ExportOutlined />}
             onClick={() =>
@@ -276,6 +275,7 @@ export function TransactionsPage() {
           />
           <DatePicker.RangePicker
             value={filters.dates ?? null}
+            showTime={{ format: 'HH:mm' }}
             onChange={(v) =>
               setFilters((f) => ({ ...f, dates: v ? [v[0], v[1]] : undefined }))
             }
@@ -387,11 +387,11 @@ export function TransactionsPage() {
             />
           </Form.Item>
           <Form.Item
-            label="发生日期"
+            label="发生时间"
             name="occurredAt"
             rules={[{ required: true }]}
           >
-            <DatePicker className="full-width" />
+            <DatePicker showTime={{ format: 'HH:mm' }} format="YYYY-MM-DD HH:mm" className="full-width" />
           </Form.Item>
           <Form.Item label="备注" name="remark">
             <Input.TextArea rows={3} maxLength={80} showCount />

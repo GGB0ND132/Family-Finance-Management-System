@@ -16,12 +16,16 @@ import {
 import type { UploadProps } from "antd";
 import { useState } from "react";
 import { useFinanceStore } from "../stores/financeStore";
+import { ScopeToggle } from "../components/ScopeToggle";
+import { useDataScope } from "../hooks/useDataScope";
+import { currentUserId } from "../data/financeData";
 export function ImportsPage() {
   const [step, setStep] = useState(0);
   const [api, holder] = message.useMessage();
   const [accountId, setAccountId] = useState<string>();
   const [file, setFile] = useState<{ name: string; type: "CSV" | "XLSX" }>();
   const { accounts, addImport, imports, confirmImport } = useFinanceStore();
+  const [scope] = useDataScope();
   const batch = imports.at(-1);
   const uploadProps: UploadProps = {
     beforeUpload: (f) => {
@@ -77,7 +81,7 @@ export function ImportsPage() {
           <Typography.Text>
             通过三步流程导入 CSV/XLSX，先预览异常与重复行，再确认写入。
           </Typography.Text>
-        </div>
+        </div><ScopeToggle />
       </div>
       <Card className="data-card">
         <Steps
@@ -96,7 +100,7 @@ export function ImportsPage() {
             value={accountId}
             onChange={setAccountId}
             options={accounts
-              .filter((a) => !a.closedAt)
+              .filter((a) => !a.closedAt && (scope === 'family' || a.ownerMemberId === currentUserId))
               .map((a) => ({ value: a.id, label: a.name }))}
             style={{ width: 300 }}
           />
@@ -163,7 +167,7 @@ export function ImportsPage() {
               pagination={false}
               columns={[
                 { title: "行号", dataIndex: "rowNumber" },
-                { title: "日期", dataIndex: "date" },
+                { title: "发生时间", dataIndex: "date" },
                 { title: "金额", dataIndex: "amount" },
                 { title: "备注", dataIndex: "remark" },
                 {

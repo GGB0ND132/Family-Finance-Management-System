@@ -11,10 +11,15 @@ import {
 } from "antd";
 import { useState } from "react";
 import { useFinanceStore } from "../stores/financeStore";
+import { ScopeToggle } from "../components/ScopeToggle";
+import { useDataScope } from "../hooks/useDataScope";
+import { currentUserId, formatDateTime } from "../data/financeData";
 export function ExportsPage() {
   const [format, setFormat] = useState<"CSV" | "XLSX">("CSV");
   const [api, holder] = message.useMessage();
   const { transactions } = useFinanceStore();
+  const [scope] = useDataScope();
+  const scopedTransactions = transactions.filter((t) => scope === 'family' || t.beneficiaryMemberId === currentUserId)
   const download = () => {
     if (format === "XLSX") {
       api.info(
@@ -23,8 +28,8 @@ export function ExportsPage() {
       return;
     }
     const header = "date,type,amount,remark\n";
-    const body = transactions
-      .map((t) => `${t.occurredAt},${t.type},${t.amount},${t.remark}`)
+    const body = scopedTransactions
+      .map((t) => `${formatDateTime(t.occurredAt)},${t.type},${t.amount},${t.remark}`)
       .join("\n");
     const blob = new Blob([header + body], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -48,7 +53,7 @@ export function ExportsPage() {
       </div>
       <Card className="data-card" title="导出条件">
         <Space wrap>
-          <DatePicker.RangePicker />
+          <ScopeToggle /><DatePicker.RangePicker showTime={{ format: 'HH:mm' }} />
           <Select
             allowClear
             placeholder="类型"

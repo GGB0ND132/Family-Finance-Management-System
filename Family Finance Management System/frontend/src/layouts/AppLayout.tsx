@@ -1,86 +1,18 @@
-import {
-  BellOutlined,
-  CalculatorOutlined,
-  CreditCardOutlined,
-  DashboardOutlined,
-  DownOutlined,
-  LogoutOutlined,
-  WalletOutlined,
-} from '@ant-design/icons'
-import { Avatar, Badge, Button, Dropdown, Layout, Menu, Space, Typography } from 'antd'
+import { AppstoreOutlined, BarChartOutlined, CalculatorOutlined, CreditCardOutlined, DashboardOutlined, DatabaseOutlined, DownOutlined, FileAddOutlined, FileExcelOutlined, LogoutOutlined, SwapOutlined, WalletOutlined } from '@ant-design/icons'
+import { Avatar, Button, Dropdown, Layout, Menu, Segmented, Space, Typography } from 'antd'
 import type { MenuProps } from 'antd'
-import { useLocation, useNavigate, Outlet } from 'react-router-dom'
+import { Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { familyMembers, demoFamilyId } from '../data/financeData'
+import { useAuthStore } from '../stores/authStore'
 
 const { Sider, Header, Content } = Layout
-
 const navigationItems: MenuProps['items'] = [
-  { key: '/dashboard', icon: <DashboardOutlined />, label: '首页仪表盘' },
-  { key: '/transactions', icon: <CreditCardOutlined />, label: '收支流水' },
-  { key: '/budgets', icon: <CalculatorOutlined />, label: '月度预算' },
+  { key: '/personal', icon: <WalletOutlined />, label: '个人首页' }, { key: '/family-dashboard', icon: <DashboardOutlined />, label: '家庭首页' }, { key: '/transactions', icon: <CreditCardOutlined />, label: '收支流水' }, { key: '/transfers', icon: <SwapOutlined />, label: '账户转账' }, { key: '/budgets', icon: <CalculatorOutlined />, label: '月度预算' }, { type: 'divider' }, { key: '/accounts', icon: <AppstoreOutlined />, label: '账户管理' }, { key: '/categories', icon: <DatabaseOutlined />, label: '分类管理' }, { key: '/reports', icon: <BarChartOutlined />, label: '数据报表' }, { key: '/imports', icon: <FileAddOutlined />, label: '账单导入' }, { key: '/exports', icon: <FileExcelOutlined />, label: '数据导出' },
 ]
 
 export function AppLayout() {
-  const navigate = useNavigate()
-  const location = useLocation()
-
-  const userMenu: MenuProps = {
-    items: [
-      { key: 'logout', icon: <LogoutOutlined />, label: '退出登录' },
-    ],
-    onClick: ({ key }) => {
-      if (key === 'logout') {
-        navigate('/login')
-      }
-    },
-  }
-
-  return (
-    <Layout className="app-shell">
-      <Sider breakpoint="lg" collapsedWidth="0" width={232} className="app-sider">
-        <div className="brand-lockup" aria-label="家账本">
-          <span className="brand-mark"><WalletOutlined /></span>
-          <span>家账本</span>
-        </div>
-        <div className="family-switcher">
-          <span className="family-switcher__label">当前家庭</span>
-          <strong>向阳之家</strong>
-          <span className="family-switcher__members">2 位成员</span>
-        </div>
-        <Menu
-          theme="dark"
-          mode="inline"
-          selectedKeys={[location.pathname]}
-          items={navigationItems}
-          onClick={({ key }) => navigate(key)}
-        />
-        <div className="sider-footer">
-          <span className="sider-footer__avatar">曾</span>
-          <div>
-            <strong>曾志翔</strong>
-            <span>家庭管理员</span>
-          </div>
-        </div>
-      </Sider>
-      <Layout>
-        <Header className="app-header">
-          <Typography.Text className="app-header__title">家庭收支管理系统</Typography.Text>
-          <Space size={18}>
-            <Badge dot color="oklch(0.59 0.16 28)">
-              <Button type="text" shape="circle" aria-label="查看通知" icon={<BellOutlined />} />
-            </Badge>
-            <Dropdown menu={userMenu} trigger={['click']}>
-              <Button type="text" className="user-trigger">
-                <Avatar size="small">曾</Avatar>
-                <span>曾志翔</span>
-                <DownOutlined />
-              </Button>
-            </Dropdown>
-          </Space>
-        </Header>
-        <Content className="app-content">
-          <Outlet />
-        </Content>
-      </Layout>
-    </Layout>
-  )
+  const navigate = useNavigate(); const location = useLocation(); const { user, logout } = useAuthStore()
+  const view = location.pathname === '/family-dashboard' ? 'family' : 'personal'
+  const userMenu: MenuProps = { items: [{ key: 'logout', icon: <LogoutOutlined />, label: '退出登录' }], onClick: ({ key }) => { if (key === 'logout') { logout(); navigate('/login') } } }
+  return <Layout className="app-shell"><Sider breakpoint="lg" collapsedWidth="0" width={232} className="app-sider"><div className="brand-lockup"><span className="brand-mark"><WalletOutlined /></span><span>家账本</span></div><div className="family-switcher"><span className="family-switcher__label">当前家庭</span><strong>晨光家庭</strong><span className="family-switcher__members">{familyMembers.length} 位成员 · {demoFamilyId}</span></div><Menu theme="dark" mode="inline" selectedKeys={[location.pathname]} items={navigationItems} onClick={({ key }) => navigate(key)} /><div className="sider-footer"><span className="sider-footer__avatar">{user?.nickname?.slice(0, 1) ?? '张'}</span><div><strong>{user?.nickname ?? '张三'}</strong><span>{user?.role === 'ADMIN' ? '家庭管理员' : '家庭成员'}</span></div></div></Sider><Layout><Header className="app-header"><Space size={18}><Segmented size="small" value={view} onChange={(value) => navigate(value === 'family' ? '/family-dashboard' : '/personal')} options={[{ label: '个人视图', value: 'personal' }, { label: '家庭视图', value: 'family' }]} /><Typography.Text className="app-header__title">家庭收支管理系统</Typography.Text></Space><Dropdown menu={userMenu} trigger={['click']}><Button type="text" className="user-trigger"><Avatar size="small">{user?.nickname?.slice(0, 1) ?? '张'}</Avatar><span>{user?.nickname ?? '张三'}</span><DownOutlined /></Button></Dropdown></Header><Content className="app-content"><Outlet /></Content></Layout></Layout>
 }

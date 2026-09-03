@@ -1,0 +1,23 @@
+# 环境配置与密钥（严禁提交）
+.env
+.env.*
+!.env.example
+
+# 依赖与虚拟环境
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# 测试与临时产物
+.pytest_cache/
+.coverage
+htmlcov/
+*.log
+*.sql
+*.json
+
+# 编辑器
+.idea/
+.vscode/
+*.swp

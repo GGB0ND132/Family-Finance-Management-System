@@ -31,8 +31,23 @@ export const accounts: Account[] = [
 ]
 
 const active = (id: string, name: string, type: CategoryType, color: string, icon: string): Category => ({ id, name, type, color, icon })
+// 默认分类，与后端 families/service.py 中 DEFAULT_CATEGORIES 及 `docs/详细设计.md` 第5.2节一致。
 export const categories: Category[] = [
-  active('food', '餐饮', 'EXPENSE', 'oklch(0.64 0.13 52)', '🍜'), active('stay', '住宿', 'EXPENSE', 'oklch(0.54 0.14 28)', '⌂'), active('transport', '交通', 'EXPENSE', 'oklch(0.6 0.12 235)', '↗'), active('housing', '住房', 'EXPENSE', 'oklch(0.56 0.12 15)', '▦'), active('shopping', '购物', 'EXPENSE', 'oklch(0.65 0.14 335)', '◇'), active('entertainment', '娱乐', 'EXPENSE', 'oklch(0.61 0.11 290)', '♪'), active('medical', '医疗', 'EXPENSE', 'oklch(0.62 0.11 15)', '+'), active('lent', '借出', 'EXPENSE', 'oklch(0.58 0.1 180)', '↗'), active('repay', '还款', 'EXPENSE', 'oklch(0.59 0.16 28)', '↻'), active('borrow', '借入', 'INCOME', 'oklch(0.55 0.12 180)', '↙'), active('collect', '收款', 'INCOME', 'oklch(0.52 0.105 150)', '●'), active('salary', '工资', 'INCOME', 'oklch(0.52 0.105 150)', '¥'), active('bonus', '奖金', 'INCOME', 'oklch(0.61 0.105 160)', '✦'), active('utilities', '水电燃气', 'EXPENSE', 'oklch(0.58 0.1 190)', '⌁'),
+  // 收入分类
+  active('borrow', '借入', 'INCOME', '#4E9F6E', '↓'),
+  active('collect', '收款', 'INCOME', '#52C41A', '●'),
+  active('salary', '工资', 'INCOME', '#1677FF', '¥'),
+  active('bonus', '奖金', 'INCOME', '#FA8C16', '✦'),
+  // 支出分类
+  active('food', '餐饮', 'EXPENSE', '#E07A5F', '🍜'),
+  active('stay', '住宿', 'EXPENSE', '#D8956A', '⌂'),
+  active('transport', '交通', 'EXPENSE', '#5B8FF9', '🚗'),
+  active('housing', '住房', 'EXPENSE', '#F6BD16', '▦'),
+  active('shopping', '购物', 'EXPENSE', '#F08BB4', '◇'),
+  active('entertainment', '娱乐', 'EXPENSE', '#9270CA', '♪'),
+  active('medical', '医疗', 'EXPENSE', '#FF7875', '+'),
+  active('lent', '借出', 'EXPENSE', '#73C0DE', '↑'),
+  active('repay', '还款', 'EXPENSE', '#8C8C8C', '↻'),
 ]
 
 export const initialTransactions: FinanceTransaction[] = [

@@ -80,7 +80,7 @@ export function PersonalPage() {
         <Button
           type="primary"
           icon={<PlusOutlined />}
-          onClick={() => navigate("/transactions")}
+          onClick={() => navigate("/transactions?create=1")}
         >
           记一笔
         </Button>

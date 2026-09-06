@@ -15,6 +15,8 @@ export function ExportsPage() {
   const [format, setFormat] = useState<"CSV" | "XLSX">("CSV");
   const [api, holder] = message.useMessage();
   const { transactions } = useFinanceStore();
+  const [range, setRange] = useState<[string, string] | undefined>();
+  const [type, setType] = useState<"INCOME" | "EXPENSE" | undefined>();
   const download = () => {
     if (format === "XLSX") {
       api.info(
@@ -22,8 +24,12 @@ export function ExportsPage() {
       );
       return;
     }
+    const filtered = transactions.filter((transaction) =>
+      (!type || transaction.type === type) &&
+      (!range || (transaction.occurredAt >= range[0] && transaction.occurredAt <= range[1])),
+    );
     const header = "date,type,amount,remark\n";
-    const body = transactions
+    const body = filtered
       .map((t) => `${t.occurredAt},${t.type},${t.amount},${t.remark}`)
       .join("\n");
     const blob = new Blob([header + body], { type: "text/csv;charset=utf-8" });
@@ -48,9 +54,11 @@ export function ExportsPage() {
       </div>
       <Card className="data-card" title="导出条件">
         <Space wrap>
-          <DatePicker.RangePicker />
+          <DatePicker.RangePicker onChange={(dates) => setRange(dates?.[0] && dates?.[1] ? [dates[0].format("YYYY-MM-DD"), dates[1].format("YYYY-MM-DD")] : undefined)} />
           <Select
             allowClear
+            value={type}
+            onChange={setType}
             placeholder="类型"
             options={[
               { value: "INCOME", label: "收入" },

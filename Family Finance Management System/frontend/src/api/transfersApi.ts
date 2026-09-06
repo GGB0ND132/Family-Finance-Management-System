@@ -4,5 +4,6 @@ export interface TransferPayload { family_id: string; from_account_id: string; t
 export const transferApi = {
   list: (familyId?: string) => apiClient.get('/transfers', { params: { family_id: familyId } }),
   create: (payload: TransferPayload) => apiClient.post('/transfers', payload),
+  update: (id: string, payload: Partial<Omit<TransferPayload, 'family_id'>>) => apiClient.patch(`/transfers/${id}`, payload),
   remove: (id: string) => apiClient.delete(`/transfers/${id}`),
 }

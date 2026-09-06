@@ -3,6 +3,9 @@ import { useAuthStore } from '../stores/authStore'
 
 export function ProtectedRoute() {
   const token = useAuthStore((state) => state.token)
+  const familyId = useAuthStore((state) => state.familyId)
   const location = useLocation()
-  return token ? <Outlet /> : <Navigate to="/login" replace state={{ from: location.pathname }} />
+  if (!token) return <Navigate to="/login" replace state={{ from: location.pathname }} />
+  if (!familyId && location.pathname !== '/family') return <Navigate to="/family" replace />
+  return <Outlet />
 }

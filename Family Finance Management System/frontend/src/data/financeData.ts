@@ -6,7 +6,8 @@ export interface FamilyMember { id: string; name: string; role: MemberRole; join
 export interface Account { id: string; ownerMemberId: string; name: string; type: AccountType; initialBalance: number; currentBalance: number; remark: string; closedAt?: string }
 export interface Category { id: string; name: string; type: CategoryType; color: string; icon: string; deletedAt?: string }
 export interface FinanceTransaction { id: string; accountId: string; categoryId: string; beneficiaryMemberId: string; recorderUserId: string; type: CategoryType; amount: number; occurredAt: string; remark: string; createdAt: string }
-export interface FinanceTransfer { id: string; fromAccountId: string; toAccountId: string; fromMemberId: string; toMemberId: string; recorderUserId: string; amount: number; occurredAt: string; remark: string; createdAt: string }
+export type TransferStatus = 'PENDING_CONFIRM' | 'CONFIRMED'
+export interface FinanceTransfer { id: string; fromAccountId: string; toAccountId: string; fromMemberId: string; toMemberId: string; recorderUserId: string; amount: number; occurredAt: string; remark: string; createdAt: string; status?: TransferStatus }
 export interface BudgetItem { categoryId: string; amount: number }
 export interface MonthlyBudget { month: string; totalAmount: number; items: BudgetItem[] }
 export interface ImportRow { rowNumber: number; date: string; amount: number; direction: CategoryType | null; remark: string; status: 'VALID' | 'INVALID' | 'DUPLICATE'; error?: string }

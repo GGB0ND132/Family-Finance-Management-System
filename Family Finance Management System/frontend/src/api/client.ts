@@ -5,9 +5,7 @@ export const apiClient = axios.create({ baseURL: import.meta.env.VITE_API_BASE_U
 
 apiClient.interceptors.request.use((config) => {
   const token = useAuthStore.getState().token
-  const familyId = useAuthStore.getState().familyId
   if (token) config.headers.Authorization = `Bearer ${token}`
-  if (familyId) config.headers['X-Family-Id'] = familyId
   return config
 })
 

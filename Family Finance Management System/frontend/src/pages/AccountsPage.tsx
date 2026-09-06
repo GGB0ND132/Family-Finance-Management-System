@@ -126,9 +126,8 @@ export function AccountsPage() {
                           description="有历史引用的账户会保留并标记为已销户。"
                           onConfirm={() => {
                             const result = removeOrCloseAccount(a.id);
-                            api.success(
-                              result === "CLOSED" ? "账户已销户" : "账户已删除",
-                            );
+                            if (result === "BLOCKED") api.error("账户仍有资金，请先转出后再销户");
+                            else api.success(result === "CLOSED" ? "账户已销户" : "账户已删除");
                           }}
                         >
                           <Button
@@ -191,7 +190,6 @@ export function AccountsPage() {
               rules={[{ required: true }]}
             >
               <InputNumber
-                min={0}
                 precision={2}
                 addonBefore="¥"
                 className="full-width"

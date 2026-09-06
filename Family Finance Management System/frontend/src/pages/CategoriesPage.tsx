@@ -32,6 +32,8 @@ export function CategoriesPage() {
     useFinanceStore();
   const displayed = categories.filter((c) => c.type === type);
   const submit = (v: CategoryForm) => {
+    const duplicate = categories.some((category) => category.id !== editing && !category.deletedAt && category.type === v.type && category.name.trim() === v.name.trim());
+    if (duplicate) { api.error("同方向的现用分类不能重名"); return; }
     if (editing) updateCategory(editing, v);
     else addCategory(v as Omit<Category, "id" | "deletedAt">);
     api.success(editing ? "分类已更新" : "分类已创建");

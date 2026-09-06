@@ -2,6 +2,8 @@ import { LockOutlined, UserOutlined, WalletOutlined } from "@ant-design/icons";
 import { Button, Card, Form, Input, Typography, message } from "antd";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuthStore } from "../stores/authStore";
+import { authApi } from "../api/authApi";
+import type { ApiResponse, AuthUser } from "../api/contracts";
 
 interface RegisterForm {
   username: string;
@@ -14,13 +16,19 @@ export function RegisterPage() {
   const navigate = useNavigate();
   const setSession = useAuthStore((state) => state.setSession);
   const [messageApi, messageContext] = message.useMessage();
-  const submit = (values: RegisterForm) => {
-    setSession(`demo-token-${values.username}`, {
-      id: "member-zhang",
-      username: values.username,
-      nickname: values.nickname,
-      role: "ADMIN",
-    });
+  const submit = async (values: RegisterForm) => {
+    let user: AuthUser = { id: "member-zhang", username: values.username, nickname: values.nickname, role: "ADMIN" };
+    let token = `demo-token-${values.username}`;
+    if (import.meta.env.VITE_API_BASE_URL) {
+      const response = await authApi.register({ username: values.username, password: values.password, nickname: values.nickname });
+      const result = response.data as ApiResponse<AuthUser> | AuthUser;
+      user = ("data" in result ? result.data : result) ?? user;
+      const loginResponse = await authApi.login({ username: values.username, password: values.password });
+      const loginResult = loginResponse.data as ApiResponse<{ access_token: string; user: AuthUser }> | { access_token: string; user: AuthUser };
+      const loginData = "data" in loginResult ? loginResult.data : loginResult;
+      if (loginData) { token = loginData.access_token; user = loginData.user; }
+    }
+    setSession(token, user, "family-sunrise");
     messageApi.success("账号创建成功，已进入你的家庭账本");
     navigate("/personal");
   };

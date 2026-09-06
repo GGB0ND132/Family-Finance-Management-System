@@ -2,6 +2,8 @@ import { LockOutlined, MailOutlined, WalletOutlined } from "@ant-design/icons";
 import { Button, Card, Checkbox, Form, Input, Typography } from "antd";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../stores/authStore";
+import { authApi } from "../api/authApi";
+import type { ApiResponse, AuthTokenResponse } from "../api/contracts";
 
 interface LoginForm {
   account: string;
@@ -13,13 +15,16 @@ export function LoginPage() {
   const navigate = useNavigate();
   const setSession = useAuthStore((state) => state.setSession);
 
-  const handleFinish = (values: LoginForm) => {
-    setSession(`demo-token-${values.account}`, {
-      id: "member-zhang",
-      username: values.account,
-      nickname: "张三",
-      role: "ADMIN",
-    });
+  const handleFinish = async (values: LoginForm) => {
+    if (import.meta.env.VITE_API_BASE_URL) {
+      const response = await authApi.login({ username: values.account, password: values.password });
+      const result = response.data as ApiResponse<AuthTokenResponse> | AuthTokenResponse;
+      const data = "data" in result ? result.data : result;
+      if (!data) return;
+      setSession(data.access_token, data.user);
+    } else {
+      setSession(`demo-token-${values.account}`, { id: "member-zhang", username: values.account, nickname: "张三", role: "ADMIN" }, "family-sunrise");
+    }
     navigate("/personal");
   };
 

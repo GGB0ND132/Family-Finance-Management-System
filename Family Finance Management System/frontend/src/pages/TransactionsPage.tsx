@@ -23,7 +23,8 @@ import {
   message,
 } from "antd";
 import type { TableColumnsType } from "antd";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   demoFamilyId,
   formatCurrency,
@@ -31,6 +32,7 @@ import {
   type FinanceTransaction,
 } from "../data/financeData";
 import { useFinanceStore } from "../stores/financeStore";
+import { useAuthStore } from "../stores/authStore";
 import {
   accountLabel,
   categoryLabel,
@@ -64,6 +66,7 @@ export function TransactionsPage() {
     min?: number;
     max?: number;
   }>({});
+  const [searchParams, setSearchParams] = useSearchParams();
   const {
     transactions,
     accounts,
@@ -73,7 +76,10 @@ export function TransactionsPage() {
     updateTransaction,
     deleteTransaction,
   } = useFinanceStore();
-  const activeAccounts = accounts.filter((a) => !a.closedAt);
+  const currentUser = useAuthStore((state) => state.user);
+  const currentMemberId = currentUser?.id ?? "member-zhang";
+  const isAdmin = currentUser?.role === "ADMIN";
+  const activeAccounts = accounts.filter((a) => !a.closedAt && (isAdmin || a.ownerMemberId === currentMemberId));
   const activeCategories = categories.filter((c) => !c.deletedAt);
   const activeType = Form.useWatch("type", form) ?? "EXPENSE";
   const filtered = useMemo(
@@ -100,22 +106,32 @@ export function TransactionsPage() {
     [accounts, filters, transactions],
   );
   const clear = () => setFilters({});
-  const openCreate = () => {
+  const openCreate = useCallback(() => {
     setEditingId(undefined);
     form.resetFields();
     form.setFieldsValue({
       type: "EXPENSE",
       occurredAt: dayjs(),
-      beneficiaryMemberId: "member-zhang",
+      beneficiaryMemberId: currentMemberId,
     });
     setOpen(true);
-  };
+  }, [currentMemberId, form]);
+  useEffect(() => {
+    if (searchParams.get("create") === "1") {
+      openCreate();
+      setSearchParams({}, { replace: true });
+    }
+  }, [openCreate, searchParams, setSearchParams]);
   const openEdit = (t: FinanceTransaction) => {
     setEditingId(t.id);
     form.setFieldsValue({ ...t, occurredAt: dayjs(t.occurredAt) });
     setOpen(true);
   };
   const save = (v: FormValues) => {
+    if (!isAdmin && (v.beneficiaryMemberId !== currentMemberId || !accounts.some((account) => account.id === v.accountId && account.ownerMemberId === currentMemberId))) {
+      messageApi.error("普通成员只能新增本人账户和本人资金归属的流水");
+      return;
+    }
     const draft = {
       ...v,
       occurredAt: v.occurredAt.format("YYYY-MM-DD"),
@@ -282,16 +298,19 @@ export function TransactionsPage() {
           />
           <InputNumber
             min={0}
+            precision={2}
             placeholder="最低金额"
             value={filters.min}
             onChange={(v) => setFilter("min", v)}
           />
           <InputNumber
             min={0}
+            precision={2}
             placeholder="最高金额"
             value={filters.max}
             onChange={(v) => setFilter("max", v)}
           />
+          <Button type="primary" onClick={() => setFilters((current) => ({ ...current }))}>查询</Button>
           <Button onClick={clear}>清除筛选</Button>
         </Space>
       </Card>
@@ -318,7 +337,7 @@ export function TransactionsPage() {
           <Space className="drawer-actions">
             <Button onClick={() => setOpen(false)}>取消</Button>
             <Button type="primary" onClick={() => form.submit()}>
-              保存流水
+              录入流水明细
             </Button>
           </Space>
         }
@@ -383,7 +402,8 @@ export function TransactionsPage() {
             rules={[{ required: true }]}
           >
             <Select
-              options={members.map((m) => ({ value: m.id, label: m.name }))}
+              disabled={!isAdmin}
+              options={members.filter((m) => isAdmin || m.id === currentMemberId).map((m) => ({ value: m.id, label: m.name }))}
             />
           </Form.Item>
           <Form.Item
@@ -393,7 +413,7 @@ export function TransactionsPage() {
           >
             <DatePicker className="full-width" />
           </Form.Item>
-          <Form.Item label="备注" name="remark">
+          <Form.Item label="备注" name="remark" rules={[{ required: true, whitespace: true, message: "请填写备注" }]}>
             <Input.TextArea rows={3} maxLength={80} showCount />
           </Form.Item>
         </Form>

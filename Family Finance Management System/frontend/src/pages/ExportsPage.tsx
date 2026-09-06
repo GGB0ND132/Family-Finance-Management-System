@@ -11,10 +11,14 @@ import {
 } from "antd";
 import { useState } from "react";
 import { useFinanceStore } from "../stores/financeStore";
+import { ScopeToggle } from "../components/ScopeToggle";
+import { useDataScope } from "../hooks/useDataScope";
+import { currentUserId, formatDateTime } from "../data/financeData";
 export function ExportsPage() {
   const [format, setFormat] = useState<"CSV" | "XLSX">("CSV");
   const [api, holder] = message.useMessage();
   const { transactions } = useFinanceStore();
+  const [scope] = useDataScope();
   const [range, setRange] = useState<[string, string] | undefined>();
   const [type, setType] = useState<"INCOME" | "EXPENSE" | undefined>();
   const download = () => {
@@ -25,12 +29,13 @@ export function ExportsPage() {
       return;
     }
     const filtered = transactions.filter((transaction) =>
+      (scope === 'family' || transaction.beneficiaryMemberId === currentUserId) &&
       (!type || transaction.type === type) &&
-      (!range || (transaction.occurredAt >= range[0] && transaction.occurredAt <= range[1])),
+      (!range || (transaction.occurredAt.slice(0, 10) >= range[0] && transaction.occurredAt.slice(0, 10) <= range[1])),
     );
     const header = "date,type,amount,remark\n";
     const body = filtered
-      .map((t) => `${t.occurredAt},${t.type},${t.amount},${t.remark}`)
+      .map((t) => `${formatDateTime(t.occurredAt)},${t.type},${t.amount},${t.remark}`)
       .join("\n");
     const blob = new Blob([header + body], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -55,6 +60,7 @@ export function ExportsPage() {
       <Card className="data-card" title="导出条件">
         <Space wrap>
           <DatePicker.RangePicker onChange={(dates) => setRange(dates?.[0] && dates?.[1] ? [dates[0].format("YYYY-MM-DD"), dates[1].format("YYYY-MM-DD")] : undefined)} />
+          <ScopeToggle /><DatePicker.RangePicker onChange={(dates) => setRange(dates?.[0] && dates?.[1] ? [dates[0].format("YYYY-MM-DD"), dates[1].format("YYYY-MM-DD")] : undefined)} />
           <Select
             allowClear
             value={type}

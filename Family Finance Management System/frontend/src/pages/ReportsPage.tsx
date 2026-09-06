@@ -5,7 +5,6 @@ import {
   Card,
   DatePicker,
   Empty,
-  Segmented,
   Space,
   Statistic,
   Tabs,
@@ -20,14 +19,17 @@ import {
   trendData,
 } from "../data/financeData";
 import { useFinanceStore } from "../stores/financeStore";
+import { ScopeToggle } from "../components/ScopeToggle";
+import { useDataScope } from "../hooks/useDataScope";
+import { currentUserId } from "../data/financeData";
 export function ReportsPage() {
   const [month, setMonth] = useState("2026-09");
-  const [mode, setMode] = useState<"personal" | "family">("family");
+  const [mode] = useDataScope();
   const { transactions } = useFinanceStore();
   const scoped = transactions.filter(
     (t) =>
       t.occurredAt.startsWith(month) &&
-      (mode === "family" || t.beneficiaryMemberId === "member-zhang"),
+      (mode === "family" || t.beneficiaryMemberId === currentUserId),
   );
   const income = scoped
     .filter((t) => t.type === "INCOME")
@@ -92,14 +94,7 @@ export function ReportsPage() {
           </Typography.Text>
         </div>
         <Space>
-          <Segmented
-            value={mode}
-            onChange={(v) => setMode(v as "personal" | "family")}
-            options={[
-              { value: "personal", label: "个人报表" },
-              { value: "family", label: "家庭报表" },
-            ]}
-          />
+          <ScopeToggle />
           <DatePicker
             picker="month"
             value={dayjs(month)}
@@ -152,7 +147,7 @@ export function ReportsPage() {
                 </Card>
               ),
             },
-            {
+            ...(mode === 'family' ? [{
               key: "members",
               label: "成员对比",
               children: (
@@ -179,7 +174,7 @@ export function ReportsPage() {
                   </Space>
                 </Card>
               ),
-            },
+            }] : []),
           ]}
         />
       )}

@@ -1,4 +1,4 @@
-import { DeleteOutlined, EditOutlined, PlusOutlined, SwapOutlined } from "@ant-design/icons";
+import { DeleteOutlined, EditOutlined, PlusOutlined } from "@ant-design/icons";
 import dayjs, { type Dayjs } from "dayjs";
 import {
   Button,
@@ -18,7 +18,9 @@ import {
 } from "antd";
 import type { TableColumnsType } from "antd";
 import { useState } from "react";
-import { formatCurrency, type FinanceTransfer } from "../data/financeData";
+import { formatCurrency, formatDateTime, type FinanceTransfer } from "../data/financeData";
+import { ScopeToggle } from "../components/ScopeToggle";
+import { useDataScope } from "../hooks/useDataScope";
 import { useFinanceStore } from "../stores/financeStore";
 import { useAuthStore } from "../stores/authStore";
 import { accountLabel, memberLabel } from "./pageUtils";
@@ -38,6 +40,7 @@ export function TransfersPage() {
   const [api, holder] = message.useMessage();
   const currentUserId = useAuthStore((state) => state.user?.id ?? "member-zhang");
   const isAdmin = useAuthStore((state) => state.user?.role === "ADMIN");
+  const [scope] = useDataScope();
   const { transfers, accounts, members, addTransfer, updateTransfer, deleteTransfer, confirmTransfer } =
     useFinanceStore();
   const active = accounts.filter((a) => !a.closedAt);
@@ -62,7 +65,7 @@ export function TransfersPage() {
       toMemberId: v.toMemberId,
       recorderUserId: "member-zhang",
       amount: v.amount,
-      occurredAt: v.occurredAt.format("YYYY-MM-DD"),
+      occurredAt: v.occurredAt.format("YYYY-MM-DDTHH:mm:00Z"),
       remark: v.remark?.trim() || "账户转账",
     };
     if (v.fromMemberId !== from.ownerMemberId || v.toMemberId !== to.ownerMemberId) {
@@ -74,7 +77,7 @@ export function TransfersPage() {
     setOpen(false);
   };
   const columns: TableColumnsType<FinanceTransfer> = [
-    { title: "日期", dataIndex: "occurredAt" },
+    { title: "发生时间", render: (_, t) => formatDateTime(t.occurredAt) },
     {
       title: "转出账户",
       render: (_, t) => (
@@ -84,7 +87,6 @@ export function TransfersPage() {
         </span>
       ),
     },
-    { title: "方向", render: () => <SwapOutlined /> },
     {
       title: "转入账户",
       render: (_, t) => (
@@ -133,7 +135,9 @@ export function TransfersPage() {
             转账只改变账户余额，不会改变收入、支出、结余或预算使用。
           </Typography.Text>
         </div>
-        <Button
+        <Space>
+          <ScopeToggle />
+          <Button
           type="primary"
           icon={<PlusOutlined />}
           onClick={() => {
@@ -144,13 +148,14 @@ export function TransfersPage() {
           }}
         >
           新增转账
-        </Button>
+          </Button>
+        </Space>
       </div>
-      <Card className="data-card" title={`转账记录 · ${transfers.length} 笔`}>
+      <Card className="data-card" title={`转账记录 · ${transfers.filter((t) => scope === 'family' || t.fromMemberId === currentUserId || t.toMemberId === currentUserId).length} 笔`}>
         <Table
           rowKey="id"
           columns={columns}
-          dataSource={transfers}
+          dataSource={transfers.filter((t) => scope === 'family' || t.fromMemberId === currentUserId || t.toMemberId === currentUserId)}
           pagination={{ pageSize: 8 }}
           scroll={{ x: 900 }}
         />
@@ -218,11 +223,11 @@ export function TransfersPage() {
             />
           </Form.Item>
           <Form.Item
-            label="发生日期"
+            label="发生时间"
             name="occurredAt"
             rules={[{ required: true }]}
           >
-            <DatePicker className="full-width" />
+            <DatePicker showTime={{ format: 'HH:mm' }} format="YYYY-MM-DD HH:mm" className="full-width" />
           </Form.Item>
           <Form.Item label="备注" name="remark">
             <Input.TextArea rows={3} />

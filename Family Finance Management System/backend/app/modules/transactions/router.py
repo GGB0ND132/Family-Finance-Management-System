@@ -1,106 +1,117 @@
 """收支流水路由。"""
 
-from fastapi import APIRouter, Depends, Query
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Query
 
-from app.common.response import ApiResponse, PageData, ok
-from app.core.deps import get_current_user, get_db
+from app.common.money import to_decimal
+from app.common.response import ok
+from app.core.deps import CurrentUser, DbSession
 from app.modules.transactions.schemas import (
     CreateTransactionRequest,
-    TransactionOut,
     UpdateTransactionRequest,
 )
 from app.modules.transactions.service import (
+    _build_out,
     create_transaction,
     delete_transaction,
     get_transaction,
     list_transactions,
+    parse_occurred_at,
     update_transaction,
 )
-from app.modules.users.models import User
 
 router = APIRouter(prefix="/transactions", tags=["流水"])
 
 
-@router.get("", response_model=ApiResponse[PageData[TransactionOut]])
-def get_transactions(
-    family_id: int,
-    scope: str = "family",
+@router.get("", summary="分页查询流水")
+def api_list_transactions(
+    db: DbSession,
+    user: CurrentUser,
+    family_id: int = Query(..., description="家庭 ID"),
+    scope: str = Query("family", description="personal | family"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    type: str | None = None,
-    account_id: int | None = None,
-    category_id: int | None = None,
-    beneficiary_member_id: int | None = None,
-    from_date: str | None = Query(None, alias="from"),
-    to_date: str | None = Query(None, alias="to"),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    type: str | None = Query(None, description="INCOME | EXPENSE"),
+    account_id: int | None = Query(None),
+    category_id: int | None = Query(None),
+    beneficiary_member_id: int | None = Query(None),
+    owner_member_id: int | None = Query(None),
+    recorder_user_id: int | None = Query(None),
+    from_: str | None = Query(None, alias="from"),
+    to_: str | None = Query(None, alias="to"),
+    min_amount: str | None = Query(None),
+    max_amount: str | None = Query(None),
 ):
-    """分页查询流水。TODO: scope=personal 时过滤受益人。"""
+    from_dt = parse_occurred_at(from_) if from_ else None
+    to_dt = parse_occurred_at(to_) if to_ else None
+    min_amt = to_decimal(min_amount) if min_amount is not None else None
+    max_amt = to_decimal(max_amount) if max_amount is not None else None
+
     items, total = list_transactions(
         db,
+        user,
         family_id,
+        scope=scope,
         page=page,
         page_size=page_size,
         type_=type,
         account_id=account_id,
         category_id=category_id,
         beneficiary_member_id=beneficiary_member_id,
-        from_date=from_date,
-        to_date=to_date,
+        owner_member_id=owner_member_id,
+        recorder_user_id=recorder_user_id,
+        from_dt=from_dt,
+        to_dt=to_dt,
+        min_amount=min_amt,
+        max_amount=max_amt,
     )
-    return ok(data=PageData(items=items, page=page, page_size=page_size, total=total))
+    return ok(
+        data={
+            "items": [_build_out(db, t) for t in items],
+            "page": page,
+            "page_size": page_size,
+            "total": total,
+        }
+    )
 
 
-@router.post("", response_model=ApiResponse[TransactionOut], status_code=201)
-def post_transaction(
+@router.post("", summary="创建收入或支出流水", status_code=201)
+def api_create_transaction(
     payload: CreateTransactionRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    db: DbSession,
+    user: CurrentUser,
 ):
-    """创建流水。recorder_user_id 由后端从 JWT 写入。"""
     tx = create_transaction(
         db,
+        user,
         family_id=payload.family_id,
         account_id=payload.account_id,
         category_id=payload.category_id,
         beneficiary_member_id=payload.beneficiary_member_id,
-        recorder_user_id=current_user.id,
         type_=payload.type,
         amount=payload.amount,
         occurred_at=payload.occurred_at,
         remark=payload.remark,
     )
-    return ok(data=tx, message="流水创建成功")
+    return ok(data=_build_out(db, tx), message="流水创建成功")
 
 
-@router.get("/{tx_id}", response_model=ApiResponse[TransactionOut])
-def get_transaction_detail(
-    tx_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    tx = get_transaction(db, tx_id)
-    # TODO: 校验家庭和权限
-    return ok(data=tx)
+@router.get("/{tx_id}", summary="查询流水详情")
+def api_get_transaction(tx_id: int, db: DbSession, user: CurrentUser):
+    tx = get_transaction(db, user, tx_id)
+    return ok(data=_build_out(db, tx))
 
 
-@router.patch("/{tx_id}", response_model=ApiResponse[TransactionOut])
-def patch_transaction(
+@router.patch("/{tx_id}", summary="编辑流水")
+def api_update_transaction(
     tx_id: int,
     payload: UpdateTransactionRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    db: DbSession,
+    user: CurrentUser,
 ):
-    tx = update_transaction(db, tx_id, **payload.model_dump(exclude_none=True))
-    return ok(data=tx)
+    tx = update_transaction(db, user, tx_id, **payload.model_dump(exclude_none=True))
+    return ok(data=_build_out(db, tx))
 
 
-@router.delete("/{tx_id}", status_code=204)
-def delete_transaction_endpoint(
-    tx_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    delete_transaction(db, tx_id)
+@router.delete("/{tx_id}", summary="删除流水", status_code=204)
+def api_delete_transaction(tx_id: int, db: DbSession, user: CurrentUser):
+    delete_transaction(db, user, tx_id)

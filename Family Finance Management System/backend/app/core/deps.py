@@ -34,7 +34,7 @@ def get_current_user(
 CurrentUser = Annotated[User, Depends(get_current_user)]
 
 
-def require_family_member(db: Session, user: User, family_id: int) -> FamilyMember:
+def require_family_member(db: DbSession, user: CurrentUser, family_id: int) -> FamilyMember:
     """校验当前用户属于目标家庭（系统设计 7，家庭数据隔离）。"""
     member = family_repo.get_member_by_user(db, family_id, user.id)
     if member is None:
@@ -42,7 +42,7 @@ def require_family_member(db: Session, user: User, family_id: int) -> FamilyMemb
     return member
 
 
-def require_family_admin(db: Session, user: User, family_id: int) -> FamilyMember:
+def require_family_admin(db: DbSession, user: CurrentUser, family_id: int) -> FamilyMember:
     """校验当前用户是该家庭管理员。"""
     member = require_family_member(db, user, family_id)
     if member.role != "ADMIN":

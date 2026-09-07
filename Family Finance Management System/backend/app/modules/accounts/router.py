@@ -27,7 +27,7 @@ from app.modules.users.models import User
 router = APIRouter(prefix="/accounts", tags=["账户"])
 
 
-@router.get("", response_model=ApiResponse[PageData[AccountOut]])
+@router.get("", summary="查询账户列表")
 def api_list_accounts(
     family_id: int = Query(..., description="家庭 ID"),
     scope: str = Query("family", description="personal | family"),
@@ -58,7 +58,7 @@ def api_list_accounts(
     return ok(data=PageData(items=items, page=page, page_size=page_size, total=total))
 
 
-@router.post("", response_model=ApiResponse[AccountOut], status_code=201)
+@router.post("", summary="创建账户", status_code=201)
 def api_create_account(
     payload: CreateAccountRequest,
     db: Session = Depends(get_db),
@@ -93,7 +93,7 @@ def api_create_account(
     return ok(data=_build_account_out(account), message="账户创建成功")
 
 
-@router.patch("/{account_id}", response_model=ApiResponse[AccountOut])
+@router.patch("/{account_id}", summary="更新账户")
 def api_update_account(
     account_id: int,
     payload: UpdateAccountRequest,

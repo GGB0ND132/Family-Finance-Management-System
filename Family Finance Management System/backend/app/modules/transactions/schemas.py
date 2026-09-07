@@ -4,6 +4,8 @@ from pydantic import BaseModel, Field
 
 
 class CreateTransactionRequest(BaseModel):
+    """创建流水请求。recorder_user_id 由后端从 JWT 写入，前端不得伪造。"""
+
     family_id: int
     account_id: int
     category_id: int
@@ -15,6 +17,8 @@ class CreateTransactionRequest(BaseModel):
 
 
 class UpdateTransactionRequest(BaseModel):
+    """编辑流水请求。类型不可修改，只能改金额、账户、分类、资金归属人、发生时间和备注。"""
+
     account_id: int | None = None
     category_id: int | None = None
     beneficiary_member_id: int | None = None
@@ -24,6 +28,8 @@ class UpdateTransactionRequest(BaseModel):
 
 
 class TransactionOut(BaseModel):
+    """流水响应：基础字段 + 用于展示的各关联名称。"""
+
     id: int
     family_id: int
     account_id: int
@@ -35,5 +41,11 @@ class TransactionOut(BaseModel):
     occurred_at: str
     remark: str | None = None
     created_at: str
-
-    model_config = {"from_attributes": True}
+    account_name: str | None = None
+    account_owner_member_id: int | None = None
+    account_owner_nickname: str | None = None
+    account_current_balance: str | None = None
+    category_name: str | None = None
+    category_type: str | None = None
+    beneficiary_nickname: str | None = None
+    recorder_nickname: str | None = None

@@ -29,7 +29,7 @@ from app.modules.users.models import User
 router = APIRouter(prefix="/categories", tags=["分类"])
 
 
-@router.get("", response_model=ApiResponse[PageData[CategoryOut]])
+@router.get("", summary="查询分类列表")
 def list_categories(
     family_id: int = Query(..., description="家庭 ID"),
     type: str | None = Query(None, description="INCOME | EXPENSE"),
@@ -45,7 +45,7 @@ def list_categories(
     return ok(data=PageData(items=categories, total=len(categories)))
 
 
-@router.post("", response_model=ApiResponse[CategoryOut], status_code=201)
+@router.post("", summary="新增分类", status_code=201)
 def post_category(
     payload: CreateCategoryRequest,
     db: Session = Depends(get_db),
@@ -71,7 +71,7 @@ def post_category(
     return ok(data=category, message="分类创建成功")
 
 
-@router.patch("/{category_id}", response_model=ApiResponse[CategoryOut])
+@router.patch("/{category_id}", summary="编辑分类")
 def patch_category(
     category_id: int,
     payload: UpdateCategoryRequest,

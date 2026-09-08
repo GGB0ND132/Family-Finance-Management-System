@@ -7,6 +7,7 @@ from app.core.exceptions import AppError
 from app.core.settings import get_settings
 from app.modules.accounts.router import router as accounts_router
 from app.modules.auth.router import router as auth_router
+from app.modules.budgets.router import router as budgets_router
 from app.modules.categories.router import router as categories_router
 from app.modules.families.router import router as families_router
 from app.modules.transactions.router import router as transactions_router
@@ -39,6 +40,7 @@ def health():
 
 app.include_router(accounts_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
+app.include_router(budgets_router, prefix="/api/v1")
 app.include_router(categories_router, prefix="/api/v1")
 app.include_router(families_router, prefix="/api/v1")
 app.include_router(transactions_router, prefix="/api/v1")

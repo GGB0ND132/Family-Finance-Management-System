@@ -1,56 +1,107 @@
-"""预算业务逻辑。"""
+"""预算业务逻辑（`docs/详细设计.md` 第 9 节）。"""
 
+import re
+from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
-from app.common.money import quantize_money
-from app.core.exceptions import PermissionDeniedError
+from app.common.money import normalize_money, quantize_money
+from app.core.exceptions import BadRequestError
 from app.modules.budgets.models import CategoryBudget, MonthlyBudget
 from app.modules.budgets.repository import BudgetRepository
+from app.modules.categories.repository import CategoryRepository
+
+_MONTH_RE = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
 
 
-def _compute_budget_usage(
-    db: Session, budget: MonthlyBudget
-) -> dict:
-    """计算预算使用率、预警等级。"""
-    # TODO: 从 transactions 表聚合当月支出
-    used = Decimal("0.00")
-    category_items = []
-    for cb in BudgetRepository(db).list_category_budgets(budget.id):
-        # TODO: 按分类聚合已用金额
-        cat_used = Decimal("0.00")
-        remaining = cb.amount - cat_used
-        rate = (
-            (cat_used / cb.amount) if cb.amount > 0 else Decimal("0.00")
-        )
-        category_items.append({
-            "category_id": cb.category_id,
-            "amount": str(cb.amount),
-            "used_amount": str(cat_used),
-            "remaining_amount": str(remaining),
-            "usage_rate": str(quantize_money(rate * 100)),
-        })
-        used += cat_used
+def _parse_month(month: str) -> tuple[int, int]:
+    if not _MONTH_RE.match(month):
+        raise BadRequestError("月份格式应为 YYYY-MM")
+    year, mon = month.split("-")
+    return int(year), int(mon)
 
-    total = budget.total_amount
-    remaining = total - used
-    rate = (used / total) if total > 0 else Decimal("0.00")
-    pct = rate * 100
 
+def _month_range(month: str) -> tuple[datetime, datetime]:
+    year, mon = _parse_month(month)
+    start = datetime(year, mon, 1)
+    end = datetime(year + 1, 1, 1) if mon == 12 else datetime(year, mon + 1, 1)
+    return start, end
+
+
+def _previous_month(month: str) -> str:
+    year, mon = _parse_month(month)
+    return f"{year - 1}-12" if mon == 1 else f"{year}-{mon - 1:02d}"
+
+
+def _money(value: Decimal) -> str:
+    return format(quantize_money(value), ".2f")
+
+
+def _non_negative(value: str, label: str) -> Decimal:
+    amount = normalize_money(value)
+    if amount < 0:
+        raise BadRequestError(f"{label}不能为负")
+    return amount
+
+
+def _warning_level(pct: Decimal) -> str:
     if pct < 80:
-        warning = "NORMAL"
-    elif pct <= 100:
-        warning = "WARNING"
-    else:
-        warning = "OVERSPENT"
+        return "NORMAL"
+    if pct <= 100:
+        return "WARNING"
+    return "OVERSPENT"
+
+
+def _build_output(
+    db: Session,
+    budget: MonthlyBudget | None,
+    family_id: int,
+    month: str,
+    scope: str,
+    member_id: int | None,
+) -> dict:
+    repo = BudgetRepository(db)
+    start, end = _month_range(month)
+    beneficiary = member_id if scope == "personal" else None
+
+    total_used = repo.sum_expense(family_id, start, end, beneficiary)
+    used_by_category = repo.sum_expense_by_category(
+        family_id, start, end, beneficiary
+    )
+
+    total = budget.total_amount if budget else Decimal("0.00")
+
+    categories = []
+    if budget:
+        for cb in repo.list_category_budgets(budget.id):
+            cat_used = used_by_category.get(cb.category_id, Decimal("0.00"))
+            cat_remaining = cb.amount - cat_used
+            cat_rate = (cat_used / cb.amount * 100) if cb.amount > 0 else Decimal("0.00")
+            categories.append(
+                {
+                    "category_id": cb.category_id,
+                    "amount": _money(cb.amount),
+                    "used_amount": _money(cat_used),
+                    "remaining_amount": _money(cat_remaining),
+                    "usage_rate": _money(cat_rate),
+                }
+            )
+
+    remaining = total - total_used
+    rate = (total_used / total * 100) if total > 0 else Decimal("0.00")
 
     return {
-        "used_amount": str(used),
-        "remaining_amount": str(remaining),
-        "usage_rate": str(quantize_money(pct)),
-        "warning_level": warning,
-        "categories": category_items,
+        "id": budget.id if budget else 0,
+        "family_id": family_id,
+        "month": month,
+        "scope": scope,
+        "total_amount": _money(total),
+        "used_amount": _money(total_used),
+        "remaining_amount": _money(remaining),
+        "usage_rate": _money(rate),
+        "warning_level": _warning_level(rate),
+        "categories": categories,
     }
 
 
@@ -60,21 +111,10 @@ def get_budget(
     month: str,
     scope: str,
     member_id: int | None = None,
-) -> dict | None:
-    """获取预算及使用情况。"""
-    repo = BudgetRepository(db)
-    budget = repo.get_by_month(family_id, month, scope, member_id)
-    if not budget:
-        return None
-    usage = _compute_budget_usage(db, budget)
-    return {
-        "id": budget.id,
-        "family_id": budget.family_id,
-        "month": budget.month,
-        "scope": budget.scope,
-        "total_amount": str(budget.total_amount),
-        **usage,
-    }
+) -> dict:
+    """返回预算及执行情况；无预算时总预算与分类预算按 0 处理。"""
+    budget = BudgetRepository(db).get_by_month(family_id, month, scope, member_id)
+    return _build_output(db, budget, family_id, month, scope, member_id)
 
 
 def put_budget(
@@ -82,38 +122,54 @@ def put_budget(
     family_id: int,
     month: str,
     scope: str,
-    member_id: int,
+    member_id: int | None,
     total_amount: str,
     categories: list[dict],
-) -> MonthlyBudget:
-    """保存/更新预算，替换分类预算明细。"""
+) -> dict:
+    """保存/更新预算并整体替换分类预算（设计 9.3）。"""
+    _parse_month(month)
     repo = BudgetRepository(db)
-    existing = repo.get_by_month(family_id, month, scope, member_id)
+    total = _non_negative(total_amount, "预算金额")
 
+    normalized = []
+    for item in categories:
+        category = CategoryRepository(db).get_by_id(item["category_id"])
+        if category is None or category.family_id != family_id:
+            raise BadRequestError("分类不存在或不属于当前家庭")
+        if category.type != "EXPENSE":
+            raise BadRequestError("预算仅支持支出分类")
+        if category.deleted_at is not None:
+            raise BadRequestError("分类已被删除")
+        amount = _non_negative(item["amount"], "分类预算金额")
+        normalized.append({"category_id": category.id, "amount": amount})
+
+    existing = repo.get_by_month(family_id, month, scope, member_id)
     if existing:
         repo.delete_category_budgets(existing.id)
-        existing.total_amount = quantize_money(Decimal(total_amount))
+        existing.total_amount = total
         budget = existing
     else:
-        budget = MonthlyBudget(
-            family_id=family_id,
-            member_id=member_id if scope == "personal" else None,
-            month=month,
-            scope=scope,
-            total_amount=quantize_money(Decimal(total_amount)),
+        budget = repo.create(
+            MonthlyBudget(
+                family_id=family_id,
+                member_id=member_id if scope == "personal" else None,
+                month=month,
+                scope=scope,
+                total_amount=total,
+            )
         )
-        budget = repo.create(budget)
 
-    for cat in categories:
+    for item in normalized:
         repo.add_category_budget(
             CategoryBudget(
                 budget_id=budget.id,
-                category_id=cat["category_id"],
-                amount=quantize_money(Decimal(cat["amount"])),
+                category_id=item["category_id"],
+                amount=item["amount"],
             )
         )
-    db.flush()
-    return budget
+
+    db.commit()
+    return get_budget(db, family_id, month, scope, member_id)
 
 
 def copy_from_previous(
@@ -122,42 +178,38 @@ def copy_from_previous(
     month: str,
     scope: str,
     member_id: int | None = None,
-) -> MonthlyBudget | None:
-    """从上一个月的预算复制到当前月份。"""
+) -> dict | None:
+    """复制同范围上月预算到当前月；无上月预算返回 None。"""
+    _parse_month(month)
     repo = BudgetRepository(db)
-
-    # 计算上月
-    year, mon = map(int, month.split("-"))
-    if mon == 1:
-        prev_month = f"{year - 1}-12"
-    else:
-        prev_month = f"{year}-{mon - 1:02d}"
-
-    prev = repo.get_by_month(family_id, prev_month, scope, member_id)
-    if not prev:
+    prev = repo.get_by_month(family_id, _previous_month(month), scope, member_id)
+    if prev is None:
         return None
 
-    # 删除当前月（如存在）并复制
     current = repo.get_by_month(family_id, month, scope, member_id)
-    if current:
+    if current is None:
+        budget = repo.create(
+            MonthlyBudget(
+                family_id=family_id,
+                member_id=member_id if scope == "personal" else None,
+                month=month,
+                scope=scope,
+                total_amount=prev.total_amount,
+            )
+        )
+    else:
         repo.delete_category_budgets(current.id)
-
-    new_budget = MonthlyBudget(
-        family_id=family_id,
-        member_id=member_id if scope == "personal" else None,
-        month=month,
-        scope=scope,
-        total_amount=prev.total_amount,
-    )
-    new_budget = repo.create(new_budget)
+        current.total_amount = prev.total_amount
+        budget = current
 
     for cb in repo.list_category_budgets(prev.id):
         repo.add_category_budget(
             CategoryBudget(
-                budget_id=new_budget.id,
+                budget_id=budget.id,
                 category_id=cb.category_id,
                 amount=cb.amount,
             )
         )
-    db.flush()
-    return new_budget
+
+    db.commit()
+    return get_budget(db, family_id, month, scope, member_id)

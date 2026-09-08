@@ -88,6 +88,7 @@ def api_create_account(
         initial_balance=payload.initial_balance,
         remark=payload.remark,
     )
+    db.commit()
     # 重新加载以获取完整的关联数据（所属成员及用户信息）
     account = get_account_with_owner(db, account.id)
     return ok(data=_build_account_out(account), message="账户创建成功")
@@ -131,6 +132,7 @@ def api_update_account(
         owner_member_id=payload.owner_member_id,
         remark=payload.remark,
     )
+    db.commit()
     # 重新加载以获取更新后的关联数据
     account = get_account_with_owner(db, account_id)
     return ok(data=_build_account_out(account))
@@ -165,4 +167,5 @@ def api_delete_account(
         raise PermissionDeniedError("只能操作自己的账户")
 
     close_or_delete_account(db, account_id=account_id, family_id=account.family_id)
+    db.commit()
     # 204 No Content，不返回响应体

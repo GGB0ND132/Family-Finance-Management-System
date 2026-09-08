@@ -34,6 +34,8 @@ def list_categories(
     family_id: int = Query(..., description="家庭 ID"),
     type: str | None = Query(None, description="INCOME | EXPENSE"),
     include_deleted: bool = Query(False, description="是否包含已删除分类"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
     member: FamilyMember = Depends(require_family_member),
 ):
@@ -42,7 +44,7 @@ def list_categories(
     categories = repo.list_by_family(
         family_id, type_=type, include_deleted=include_deleted
     )
-    return ok(data=PageData(items=categories, total=len(categories)))
+    return ok(data=PageData(items=categories, page=page, page_size=page_size, total=len(categories)))
 
 
 @router.post("", summary="新增分类", status_code=201)
@@ -68,6 +70,7 @@ def post_category(
         icon=payload.icon,
         color=payload.color,
     )
+    db.commit()
     return ok(data=category, message="分类创建成功")
 
 
@@ -90,6 +93,7 @@ def patch_category(
         raise PermissionDeniedError("需要管理员权限")
 
     category = update_category(db, category_id, **payload.model_dump(exclude_none=True))
+    db.commit()
     return ok(data=category)
 
 
@@ -115,4 +119,5 @@ def delete_category_endpoint(
         raise PermissionDeniedError("需要管理员权限")
 
     delete_category(db, category_id)
+    db.commit()
     # 204 No Content，不返回响应体

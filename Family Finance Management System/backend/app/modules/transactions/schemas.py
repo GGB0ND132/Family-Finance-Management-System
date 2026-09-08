@@ -1,6 +1,21 @@
 """流水 Pydantic 模型。"""
 
-from pydantic import BaseModel, Field
+from decimal import Decimal
+from datetime import datetime
+from typing import Annotated
+
+from pydantic import BaseModel, Field, BeforeValidator
+
+
+def _str_converter(v):
+    if isinstance(v, Decimal):
+        return str(v)
+    if isinstance(v, datetime):
+        return v.isoformat()
+    return v
+
+
+StrField = Annotated[str, BeforeValidator(_str_converter)]
 
 
 class CreateTransactionRequest(BaseModel):
@@ -37,9 +52,10 @@ class TransactionOut(BaseModel):
     beneficiary_member_id: int
     recorder_user_id: int
     type: str
-    amount: str
-    occurred_at: str
+    amount: StrField
+    occurred_at: StrField
     remark: str | None = None
+<<<<<<< HEAD
     created_at: str
     account_name: str | None = None
     account_owner_member_id: int | None = None
@@ -49,3 +65,8 @@ class TransactionOut(BaseModel):
     category_type: str | None = None
     beneficiary_nickname: str | None = None
     recorder_nickname: str | None = None
+=======
+    created_at: StrField
+
+    model_config = {"from_attributes": True}
+>>>>>>> ce9db4e (feat: 外部账单导入模块)

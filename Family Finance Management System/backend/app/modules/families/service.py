@@ -40,6 +40,11 @@ def join_family(db: Session, user: User, invite_code: str) -> FamilyMember:
     return member
 
 
+def get_member(db: Session, family_id: int, user_id: int) -> FamilyMember | None:
+    """校验并返回家庭成员。"""
+    return family_repo.get_member_by_user(db, family_id, user_id)
+
+
 def update_family_name(db: Session, family: Family, name: str) -> Family:
     family.name = name.strip()
     db.commit()

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime
 
 from sqlalchemy import DateTime, ForeignKey, String, UniqueConstraint, func
@@ -33,7 +35,11 @@ class FamilyMember(Base):
     role: Mapped[str] = mapped_column(String(20), default=MemberRole.MEMBER, nullable=False)
     joined_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
 
+<<<<<<< HEAD
     # 关联
     user: Mapped["User"] = relationship(  # noqa: F821
         foreign_keys=[user_id],
     )
+=======
+    user: Mapped["User"] = relationship(foreign_keys=[user_id])  # noqa: F821
+>>>>>>> ce9db4e (feat: 外部账单导入模块)

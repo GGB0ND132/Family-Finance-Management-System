@@ -15,7 +15,9 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-config.set_main_option("sqlalchemy.url", get_settings().DATABASE_URL)
+# Alembic 使用 ConfigParser 保存选项；数据库 URL 中的百分号（例如密码的 %40）
+# 必须按 ConfigParser 规则转义，之后 engine_from_config 会得到原始 URL。
+config.set_main_option("sqlalchemy.url", get_settings().DATABASE_URL.replace("%", "%%"))
 
 target_metadata = Base.metadata
 

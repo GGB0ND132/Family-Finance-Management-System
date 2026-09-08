@@ -20,12 +20,12 @@ export interface PageData<T> {
 }
 
 export interface AuthUser {
-  id: string
+  id: number | string
   username: string
   nickname: string
+  role?: 'ADMIN' | 'MEMBER'
   real_name?: string
   avatar?: string
-  role?: 'ADMIN' | 'MEMBER'
 }
 
 export interface AuthTokenResponse {
@@ -55,10 +55,11 @@ export interface FamilySummary {
 }
 
 export interface FamilyMemberResponse {
-  id: string
-  user_id: string
-  family_id: string
-  name: string
+  id: number | string
+  user_id: number | string
+  family_id: number | string
+  name?: string
+  nickname?: string
   username?: string
   role: 'ADMIN' | 'MEMBER'
   joined_at: string

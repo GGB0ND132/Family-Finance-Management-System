@@ -99,6 +99,19 @@ class TestUpdateProfile:
         me = client.get("/api/v1/users/me", headers=auth_header(token)).json()["data"]
         assert me["nickname"] == "新昵称"
 
+    def test_update_profile_with_base64_avatar(self, client):
+        register_user(client)
+        token = login(client).json()["data"]["access_token"]
+        avatar = "data:image/png;base64," + "A" * 2048
+        resp = client.patch(
+            "/api/v1/users/me",
+            json={"nickname": "小红", "real_name": "王小红", "avatar": avatar},
+            headers=auth_header(token),
+        )
+        assert resp.status_code == 200
+        assert resp.json()["data"]["real_name"] == "王小红"
+        assert resp.json()["data"]["avatar"] == avatar
+
 
 class TestChangePassword:
     def test_change_password_success(self, client):

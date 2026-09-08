@@ -116,7 +116,7 @@ export function TransactionsPage() {
     form.setFieldsValue({
       type: "EXPENSE",
       occurredAt: dayjs(),
-      beneficiaryMemberId: currentMemberId,
+      beneficiaryMemberId: String(currentMemberId),
     });
     setOpen(true);
   }, [currentMemberId, form]);

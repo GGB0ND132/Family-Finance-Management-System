@@ -1,6 +1,5 @@
 import { create } from 'zustand'
 import type { AuthUser } from '../api/contracts'
-import { demoFamilyId } from '../data/financeData'
 
 interface AuthState { token: string | null; user: AuthUser | null; familyId: string | null; setSession: (token: string, user: AuthUser, familyId?: string | null) => void; updateUser: (user: AuthUser) => void; setFamily: (familyId: string | null) => void; logout: () => void }
 const tokenKey = 'family-finance-token'
@@ -12,7 +11,7 @@ const storedUser = localStorage.getItem(userKey)
 export const useAuthStore = create<AuthState>((set) => ({
   token: localStorage.getItem(tokenKey),
   user: storedUser ? JSON.parse(storedUser) as AuthUser : null,
-  familyId: localStorage.getItem(familyKey) ?? (localStorage.getItem(tokenKey) ? demoFamilyId : null),
+  familyId: localStorage.getItem(familyKey),
   setSession: (token, user, familyId = null) => {
     localStorage.setItem(tokenKey, token)
     localStorage.setItem(userKey, JSON.stringify(user))

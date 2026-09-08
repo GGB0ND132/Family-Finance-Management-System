@@ -3,7 +3,8 @@ import { Button, Card, Checkbox, Form, Input, Typography } from "antd";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../stores/authStore";
 import { authApi } from "../api/authApi";
-import type { ApiResponse, AuthTokenResponse } from "../api/contracts";
+import type { ApiResponse, AuthTokenResponse, FamilySummary } from "../api/contracts";
+import { familyApi } from "../api/familiesApi";
 
 interface LoginForm {
   account: string;
@@ -16,16 +17,20 @@ export function LoginPage() {
   const setSession = useAuthStore((state) => state.setSession);
 
   const handleFinish = async (values: LoginForm) => {
-    if (import.meta.env.VITE_API_BASE_URL) {
-      const response = await authApi.login({ username: values.account, password: values.password });
-      const result = response.data as ApiResponse<AuthTokenResponse> | AuthTokenResponse;
-      const data = "data" in result ? result.data : result;
-      if (!data) return;
-      setSession(data.access_token, data.user);
-    } else {
-      setSession(`demo-token-${values.account}`, { id: "member-zhang", username: values.account, nickname: "张三", role: "ADMIN" }, "family-sunrise");
+    const response = await authApi.login({ username: values.account, password: values.password });
+    const result = response.data as ApiResponse<AuthTokenResponse>;
+    const data = result.data;
+    if (!data) return;
+    setSession(data.access_token, data.user);
+    let familyData: FamilySummary[] = [];
+    try {
+      const families = (await familyApi.list()).data;
+      familyData = families.data ?? [];
+    } catch {
+      // 登录成功后即使家庭列表暂时不可用，也允许用户进入家庭设置页重试。
     }
-    navigate("/personal");
+    if (familyData.length) useAuthStore.getState().setFamily(String(familyData[0].id));
+    navigate(familyData.length ? "/personal" : "/family");
   };
 
   return (
@@ -67,11 +72,7 @@ export function LoginPage() {
           <Form<LoginForm>
             layout="vertical"
             requiredMark={false}
-            initialValues={{
-              account: "zengzhixiang",
-              password: "12345678",
-              remember: true,
-            }}
+            initialValues={{ remember: true }}
             onFinish={handleFinish}
           >
             <Form.Item

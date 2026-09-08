@@ -17,20 +17,16 @@ export function RegisterPage() {
   const setSession = useAuthStore((state) => state.setSession);
   const [messageApi, messageContext] = message.useMessage();
   const submit = async (values: RegisterForm) => {
-    let user: AuthUser = { id: "member-zhang", username: values.username, nickname: values.nickname, role: "ADMIN" };
-    let token = `demo-token-${values.username}`;
-    if (import.meta.env.VITE_API_BASE_URL) {
-      const response = await authApi.register({ username: values.username, password: values.password, nickname: values.nickname });
-      const result = response.data as ApiResponse<AuthUser> | AuthUser;
-      user = ("data" in result ? result.data : result) ?? user;
-      const loginResponse = await authApi.login({ username: values.username, password: values.password });
-      const loginResult = loginResponse.data as ApiResponse<{ access_token: string; user: AuthUser }> | { access_token: string; user: AuthUser };
-      const loginData = "data" in loginResult ? loginResult.data : loginResult;
-      if (loginData) { token = loginData.access_token; user = loginData.user; }
-    }
-    setSession(token, user, "family-sunrise");
-    messageApi.success("账号创建成功，已进入你的家庭账本");
-    navigate("/personal");
+    const response = await authApi.register({ username: values.username, password: values.password, nickname: values.nickname });
+    const result = response.data as ApiResponse<AuthUser>;
+    const user = result.data;
+    if (!user) return;
+    const loginResponse = await authApi.login({ username: values.username, password: values.password });
+    const loginData = (loginResponse.data as ApiResponse<{ access_token: string; user: AuthUser }>).data;
+    if (!loginData) return;
+    setSession(loginData.access_token, loginData.user);
+    messageApi.success("账号创建成功，请创建或加入家庭");
+    navigate("/family");
   };
   return (
     <main className="login-page">
@@ -66,7 +62,7 @@ export function RegisterPage() {
               创建家庭账号
             </Typography.Title>
             <Typography.Paragraph>
-              注册后你会自动成为家庭管理员。
+              注册后创建或加入家庭即可开始记账。
             </Typography.Paragraph>
           </div>
           <Form<RegisterForm>

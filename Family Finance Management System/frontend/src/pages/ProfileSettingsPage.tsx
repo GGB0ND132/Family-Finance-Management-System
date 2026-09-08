@@ -18,7 +18,7 @@ export function ProfileSettingsPage() {
   const saveProfile = async (values: ProfileForm) => {
     const avatar = selectedAvatar?.trim() || values.avatar?.trim() || undefined
     let nextUser = { ...user, ...values, avatar } as AuthUser
-    if (import.meta.env.VITE_API_BASE_URL) { const response = await authApi.updateProfile({ nickname: values.nickname, real_name: values.real_name, avatar }); const result = response.data as ApiResponse<AuthUser> | AuthUser; nextUser = ('data' in result ? result.data : result) ?? nextUser }
+    const response = await authApi.updateProfile({ nickname: values.nickname, real_name: values.real_name, avatar }); const result = response.data as ApiResponse<AuthUser>; nextUser = result.data ?? nextUser
     updateUser(nextUser); form.setFieldValue('avatar', avatar ?? ''); api.success('个人信息已保存，头像已更新')
   }
   const uploadProps: UploadProps = { accept: 'image/png,image/jpeg,image/webp,image/gif', showUploadList: false, beforeUpload: (file) => { if (file.size > 2 * 1024 * 1024) { api.error('头像图片不能超过 2MB'); return Upload.LIST_IGNORE } setReadingAvatar(true); const reader = new FileReader(); reader.onload = () => { const result = typeof reader.result === 'string' ? reader.result : undefined; setSelectedAvatar(result); form.setFieldValue('avatar', result); setReadingAvatar(false) }; reader.onerror = () => { setReadingAvatar(false); api.error('头像读取失败，请重新选择图片') }; reader.readAsDataURL(file); return false } }

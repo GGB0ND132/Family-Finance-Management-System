@@ -1,8 +1,10 @@
 import { AppstoreOutlined, BarChartOutlined, CalculatorOutlined, CreditCardOutlined, DashboardOutlined, DatabaseOutlined, DownOutlined, FileAddOutlined, FileExcelOutlined, LogoutOutlined, SettingOutlined, SwapOutlined, UserOutlined, WalletOutlined } from '@ant-design/icons'
-import { Avatar, Button, Dropdown, Layout, Menu, Segmented, Space, Typography } from 'antd'
+import { Avatar, Button, Dropdown, Layout, Menu, Typography } from 'antd'
 import type { MenuProps } from 'antd'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { familyMembers, demoFamilyId } from '../data/financeData'
+import { useEffect, useState } from 'react'
+import { familyApi } from '../api/familiesApi'
+import type { FamilySummary } from '../api/contracts'
 import { useAuthStore } from '../stores/authStore'
 
 const { Sider, Header, Content } = Layout
@@ -11,8 +13,9 @@ const navigationItems: MenuProps['items'] = [
 ]
 
 export function AppLayout() {
-  const navigate = useNavigate(); const location = useLocation(); const { user, logout } = useAuthStore()
-  const view = location.pathname === '/family-dashboard' ? 'family' : 'personal'
+  const navigate = useNavigate(); const location = useLocation(); const { user, familyId, logout } = useAuthStore(); const [families, setFamilies] = useState<FamilySummary[]>([])
+  useEffect(() => { familyApi.list().then((response) => { const result = response.data; setFamilies(result.data ?? []) }).catch(() => setFamilies([])) }, [familyId])
+  const currentFamily = families.find((family) => String(family.id) === familyId)
   const userMenu: MenuProps = { items: [{ key: 'statistics', icon: <BarChartOutlined />, label: '个人流水统计' }, { key: 'profile', icon: <UserOutlined />, label: '个人信息设置' }, { type: 'divider' }, { key: 'logout', icon: <LogoutOutlined />, label: '退出登录' }], onClick: ({ key }) => { if (key === 'statistics') navigate('/profile/statistics'); if (key === 'profile') navigate('/profile/settings'); if (key === 'logout') { logout(); navigate('/login') } } }
-  return <Layout className="app-shell"><Sider breakpoint="lg" collapsedWidth="0" width={232} className="app-sider"><div className="brand-lockup"><span className="brand-mark"><WalletOutlined /></span><span>家账本</span></div><div className="family-switcher"><span className="family-switcher__label">当前家庭</span><strong>晨光家庭</strong><span className="family-switcher__members">{familyMembers.length} 位成员 · {demoFamilyId}</span></div><Menu theme="dark" mode="inline" selectedKeys={[location.pathname]} items={navigationItems} onClick={({ key }) => navigate(key)} /><div className="sider-footer"><Avatar src={user?.avatar} className="sider-footer__avatar">{user?.nickname?.slice(0, 1) ?? '张'}</Avatar><div><strong>{user?.nickname ?? '张三'}</strong><span>{user?.role === 'ADMIN' ? '家庭管理员' : '家庭成员'}</span></div></div></Sider><Layout><Header className="app-header"><Space size={18}><Segmented size="small" value={view} onChange={(value) => navigate(value === 'family' ? '/family-dashboard' : '/personal')} options={[{ label: '个人视图', value: 'personal' }, { label: '家庭视图', value: 'family' }]} /><Typography.Text className="app-header__title">家庭收支管理系统</Typography.Text></Space><Dropdown menu={userMenu} trigger={['click']}><Button type="text" className="user-trigger"><Avatar size="small" src={user?.avatar}>{user?.nickname?.slice(0, 1) ?? '张'}</Avatar><span>{user?.nickname ?? '张三'}</span><DownOutlined /></Button></Dropdown></Header><Content className="app-content"><Outlet /></Content></Layout></Layout>
+  return <Layout className="app-shell"><Sider breakpoint="lg" collapsedWidth="0" width={232} className="app-sider"><div className="brand-lockup"><span className="brand-mark"><WalletOutlined /></span><span>家账本</span></div><div className="family-switcher"><span className="family-switcher__label">当前家庭</span><strong>{currentFamily?.name ?? '未选择家庭'}</strong><span className="family-switcher__members">{currentFamily ? `${currentFamily.members_count} 位成员 · #${currentFamily.id}` : '请先创建或加入家庭'}</span></div><Menu theme="dark" mode="inline" selectedKeys={[location.pathname]} items={navigationItems} onClick={({ key }) => navigate(key)} /></Sider><Layout><Header className="app-header"><Typography.Text className="app-header__title">家庭收支管理系统</Typography.Text><Dropdown menu={userMenu} trigger={['click']}><Button type="text" className="user-trigger"><Avatar size="small" src={user?.avatar}>{user?.nickname?.slice(0, 1) ?? '?'}</Avatar><span>{user?.nickname ?? '未登录'}</span><DownOutlined /></Button></Dropdown></Header><Content className="app-content"><Outlet /></Content></Layout></Layout>
 }

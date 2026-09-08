@@ -14,7 +14,7 @@ export function ProfilePage() {
   const [api, holder] = message.useMessage()
   const { user, updateUser } = useAuthStore()
   const { transactions, accounts, categories } = useFinanceStore()
-  const memberId = user?.id ?? 'member-zhang'
+  const memberId = user?.id ? String(user.id) : ''
   const personalTransactions = transactions.filter((item) => item.beneficiaryMemberId === memberId)
   const income = personalTransactions.filter((item) => item.type === 'INCOME').reduce((sum, item) => sum + item.amount, 0)
   const expense = personalTransactions.filter((item) => item.type === 'EXPENSE').reduce((sum, item) => sum + item.amount, 0)
@@ -23,7 +23,7 @@ export function ProfilePage() {
   useEffect(() => { form.setFieldsValue({ nickname: user?.nickname, real_name: user?.real_name, avatar: user?.avatar }) }, [form, user])
   const saveProfile = async (values: ProfileForm) => {
     let nextUser = { ...user, ...values } as AuthUser
-    if (import.meta.env.VITE_API_BASE_URL) { const response = await authApi.updateProfile({ nickname: values.nickname, real_name: values.real_name, avatar: values.avatar }); const result = response.data as ApiResponse<AuthUser> | AuthUser; nextUser = ('data' in result ? result.data : result) ?? nextUser }
+    const response = await authApi.updateProfile({ nickname: values.nickname, real_name: values.real_name, avatar: values.avatar }); const result = response.data as ApiResponse<AuthUser>; nextUser = result.data ?? nextUser
     updateUser(nextUser)
     api.success('个人信息已保存')
   }

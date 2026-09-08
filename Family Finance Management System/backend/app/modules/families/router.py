@@ -53,6 +53,16 @@ def join(user: CurrentUser, db: DbSession, payload: JoinFamilyRequest):
     return ok({"family_id": member.family_id}, message="加入家庭成功")
 
 
+@router.get("/{family_id}", summary="查询家庭详情")
+def get_detail(family_id: int, user: CurrentUser, db: DbSession):
+    require_family_member(db, user, family_id)
+    family = family_repo.get_family_by_id(db, family_id)
+    if family is None:
+        from app.core.exceptions import NotFoundError
+        raise NotFoundError("家庭不存在")
+    return ok(_family_out(db, family))
+
+
 @router.patch("/{family_id}", summary="修改家庭名称（管理员）")
 def update_name(family_id: int, payload: UpdateFamilyNameRequest, user: CurrentUser, db: DbSession):
     admin = require_family_admin(db, user, family_id)

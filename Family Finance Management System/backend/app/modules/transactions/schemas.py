@@ -55,7 +55,6 @@ class TransactionOut(BaseModel):
     amount: StrField
     occurred_at: StrField
     remark: str | None = None
-<<<<<<< HEAD
     created_at: str
     account_name: str | None = None
     account_owner_member_id: int | None = None
@@ -65,8 +64,3 @@ class TransactionOut(BaseModel):
     category_type: str | None = None
     beneficiary_nickname: str | None = None
     recorder_nickname: str | None = None
-=======
-    created_at: StrField
-
-    model_config = {"from_attributes": True}
->>>>>>> ce9db4e (feat: 外部账单导入模块)

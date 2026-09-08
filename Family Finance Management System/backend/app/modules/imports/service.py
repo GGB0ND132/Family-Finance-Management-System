@@ -122,6 +122,8 @@ def confirm_import(db: Session, batch_id: int, user_id: int) -> dict:
     _ensure_access(db, batch, user_id)
     if batch.status != "PREVIEWED":
         raise BadRequestError("该批次已处理")
+    if batch.invalid_rows > 0:
+        raise BadRequestError("批次包含无效行，请修正后重新上传导入", code=40020)
 
     account = _ensure_account(db, batch.family_id, batch.account_id)
 

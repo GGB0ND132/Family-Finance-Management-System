@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyc
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+
+# Python 缓存与测试产物
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# 本地数据库
+*.db
+*.sqlite
+*.sqlite3

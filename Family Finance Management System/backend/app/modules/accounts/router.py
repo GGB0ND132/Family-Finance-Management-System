@@ -27,7 +27,7 @@ from app.modules.users.models import User
 router = APIRouter(prefix="/accounts", tags=["账户"])
 
 
-@router.get("", response_model=ApiResponse[PageData[AccountOut]])
+@router.get("", summary="查询账户列表")
 def api_list_accounts(
     family_id: int = Query(..., description="家庭 ID"),
     scope: str = Query("family", description="personal | family"),
@@ -58,7 +58,7 @@ def api_list_accounts(
     return ok(data=PageData(items=items, page=page, page_size=page_size, total=total))
 
 
-@router.post("", response_model=ApiResponse[AccountOut], status_code=201)
+@router.post("", summary="创建账户", status_code=201)
 def api_create_account(
     payload: CreateAccountRequest,
     db: Session = Depends(get_db),
@@ -88,12 +88,13 @@ def api_create_account(
         initial_balance=payload.initial_balance,
         remark=payload.remark,
     )
+    db.commit()
     # 重新加载以获取完整的关联数据（所属成员及用户信息）
     account = get_account_with_owner(db, account.id)
     return ok(data=_build_account_out(account), message="账户创建成功")
 
 
-@router.patch("/{account_id}", response_model=ApiResponse[AccountOut])
+@router.patch("/{account_id}", summary="更新账户")
 def api_update_account(
     account_id: int,
     payload: UpdateAccountRequest,
@@ -131,6 +132,7 @@ def api_update_account(
         owner_member_id=payload.owner_member_id,
         remark=payload.remark,
     )
+    db.commit()
     # 重新加载以获取更新后的关联数据
     account = get_account_with_owner(db, account_id)
     return ok(data=_build_account_out(account))
@@ -165,4 +167,5 @@ def api_delete_account(
         raise PermissionDeniedError("只能操作自己的账户")
 
     close_or_delete_account(db, account_id=account_id, family_id=account.family_id)
+    db.commit()
     # 204 No Content，不返回响应体

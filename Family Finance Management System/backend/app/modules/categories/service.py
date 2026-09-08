@@ -29,7 +29,7 @@ def create_category(
     if existing:
         raise ConflictError("同家庭同方向已存在同名分类")
 
-    return repo.create(
+    category = repo.create(
         Category(
             family_id=family_id,
             name=name,
@@ -38,6 +38,8 @@ def create_category(
             color=color,
         )
     )
+    db.commit()
+    return category
 
 
 def get_category(db: Session, category_id: int) -> Category:

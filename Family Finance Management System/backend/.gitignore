@@ -11,11 +11,17 @@ __pycache__/
 
 # 测试与临时产物
 .pytest_cache/
+.ruff_cache/
 .coverage
 htmlcov/
 *.log
 *.sql
 *.json
+
+# 本地数据库（SQLite 开发/测试库，勿提交）
+*.db
+*.sqlite
+*.sqlite3
 
 # 编辑器
 .idea/

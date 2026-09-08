@@ -5,8 +5,16 @@ from fastapi.responses import JSONResponse
 from app.common.response import ok
 from app.core.exceptions import AppError
 from app.core.settings import get_settings
+from app.modules.accounts.router import router as accounts_router
 from app.modules.auth.router import router as auth_router
+from app.modules.budgets.router import router as budgets_router
+from app.modules.categories.router import router as categories_router
+from app.modules.exports.router import router as exports_router
 from app.modules.families.router import router as families_router
+from app.modules.imports.router import router as imports_router
+from app.modules.reports.router import router as reports_router
+from app.modules.transactions.router import router as transactions_router
+from app.modules.transfers.router import router as transfers_router
 from app.modules.users.router import router as users_router
 
 settings = get_settings()
@@ -33,6 +41,14 @@ def health():
     return ok({"status": "ok"})
 
 
+app.include_router(accounts_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
-app.include_router(users_router, prefix="/api/v1")
+app.include_router(budgets_router, prefix="/api/v1")
+app.include_router(categories_router, prefix="/api/v1")
+app.include_router(exports_router, prefix="/api/v1")
 app.include_router(families_router, prefix="/api/v1")
+app.include_router(imports_router, prefix="/api/v1")
+app.include_router(reports_router, prefix="/api/v1")
+app.include_router(transactions_router, prefix="/api/v1")
+app.include_router(transfers_router, prefix="/api/v1")
+app.include_router(users_router, prefix="/api/v1")

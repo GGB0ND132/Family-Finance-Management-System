@@ -11,6 +11,11 @@ from app.modules.users.models import User
 INVITE_CODE_VALID_HOURS = 24 * 7  # 邀请码默认 7 天有效
 
 
+def get_member(db: Session, family_id: int, user_id: int) -> FamilyMember | None:
+    """根据家庭 ID 和用户 ID 查询成员。"""
+    return family_repo.get_member_by_user(db, family_id, user_id)
+
+
 def create_family(db: Session, user: User, name: str) -> Family:
     """创建家庭，并在同一事务中写入创建者的管理员成员记录（详细设计 3.3）。"""
     family = family_repo.create_family(db, name.strip(), user.id)
@@ -33,6 +38,11 @@ def join_family(db: Session, user: User, invite_code: str) -> FamilyMember:
     db.commit()
     db.refresh(member)
     return member
+
+
+def get_member(db: Session, family_id: int, user_id: int) -> FamilyMember | None:
+    """校验并返回家庭成员。"""
+    return family_repo.get_member_by_user(db, family_id, user_id)
 
 
 def update_family_name(db: Session, family: Family, name: str) -> Family:

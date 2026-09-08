@@ -1,37 +1,38 @@
 """导入路由。"""
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile
-from sqlalchemy.orm import Session
+import json
 
-from app.common.response import ApiResponse, ok
-from app.core.deps import get_current_user, get_db
-from app.core.settings import settings
+from fastapi import APIRouter, File, Form, UploadFile
+
+from app.common.response import ok
+from app.core.deps import CurrentUser, DbSession
+from app.core.exceptions import BadRequestError
+from app.core.settings import get_settings
 from app.modules.imports.service import confirm_import, get_batch, preview_import
-from app.modules.users.models import User
 
 router = APIRouter(prefix="/imports", tags=["导入"])
 
 
-@router.post("/preview", response_model=ApiResponse)
+@router.post("/preview", summary="上传文件并返回预览批次")
 async def preview(
+    user: CurrentUser,
+    db: DbSession,
     file: UploadFile = File(...),
     family_id: int = Form(...),
     account_id: int = Form(...),
     scope: str = Form("personal"),
     field_mapping_json: str = Form("{}"),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
-    """上传文件并返回预览。"""
-    import json
-
-    # 校验文件大小
+    """上传 CSV/XLSX，校验文件并返回预览批次（VALID/INVALID/DUPLICATE）。"""
     contents = await file.read()
-    if len(contents) > settings.IMPORT_MAX_FILE_SIZE:
-        from app.core.exceptions import ValidationError
-        raise ValidationError(f"文件大小不能超过 {settings.IMPORT_MAX_FILE_SIZE // 1024 // 1024}MB")
+    max_size = get_settings().IMPORT_MAX_FILE_SIZE
+    if len(contents) > max_size:
+        raise BadRequestError(f"文件大小不能超过 {max_size // 1024 // 1024}MB")
 
-    field_mapping = json.loads(field_mapping_json)
+    try:
+        field_mapping = json.loads(field_mapping_json or "{}")
+    except ValueError as exc:
+        raise BadRequestError("字段映射格式非法") from exc
 
     result = preview_import(
         db,
@@ -39,32 +40,20 @@ async def preview(
         file.filename or "unnamed",
         family_id,
         account_id,
-        current_user.id,
+        user.id,
         field_mapping,
     )
     return ok(data=result)
 
 
-@router.get("/{batch_id}", response_model=ApiResponse)
-def get_import_batch(
-    batch_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
+@router.get("/{batch_id}", summary="获取导入批次详情")
+def get_import_batch(batch_id: int, user: CurrentUser, db: DbSession):
     """获取导入批次详情。仅上传人或管理员可访问。"""
-    result = get_batch(db, batch_id)
-    if not result:
-        from app.core.exceptions import ResourceNotFoundError
-        raise ResourceNotFoundError("批次不存在")
-    return ok(data=result)
+    return ok(data=get_batch(db, batch_id, user.id))
 
 
-@router.post("/{batch_id}/confirm", response_model=ApiResponse)
-def confirm(
-    batch_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """确认导入，写入流水并更新余额。"""
-    result = confirm_import(db, batch_id, current_user.id)
+@router.post("/{batch_id}/confirm", summary="确认导入")
+def confirm(batch_id: int, user: CurrentUser, db: DbSession):
+    """确认导入，有效行写入流水并更新余额（整体事务，失败回滚）。"""
+    result = confirm_import(db, batch_id, user.id)
     return ok(data=result, message="导入成功")

@@ -1,4 +1,6 @@
-"""预算 Pydantic 模型。"""
+"""预算 Pydantic 请求模型。"""
+
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -10,36 +12,11 @@ class CategoryBudgetItem(BaseModel):
 
 class PutBudgetRequest(BaseModel):
     family_id: int
-    scope: str = Field(pattern="^(personal|family)$")
+    scope: Literal["personal", "family"]
     total_amount: str
-    categories: list[CategoryBudgetItem] = []
+    categories: list[CategoryBudgetItem] = Field(default_factory=list)
 
 
 class CopyBudgetRequest(BaseModel):
     family_id: int
-    scope: str = Field(pattern="^(personal|family)$")
-
-
-class CategoryBudgetOut(BaseModel):
-    category_id: int
-    amount: str
-    used_amount: str = "0.00"
-    remaining_amount: str = "0.00"
-    usage_rate: str = "0.00"
-
-    model_config = {"from_attributes": True}
-
-
-class BudgetOut(BaseModel):
-    id: int
-    family_id: int
-    month: str
-    scope: str
-    total_amount: str
-    used_amount: str = "0.00"
-    remaining_amount: str = "0.00"
-    usage_rate: str = "0.00"
-    warning_level: str = "NORMAL"
-    categories: list[CategoryBudgetOut] = []
-
-    model_config = {"from_attributes": True}
+    scope: Literal["personal", "family"]

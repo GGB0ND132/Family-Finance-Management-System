@@ -25,6 +25,10 @@ class BadRequestError(AppError):
     code = 40001
 
 
+class ValidationError(BadRequestError):
+    """业务规则校验失败（等同 BadRequestError）。"""
+
+
 class UnauthorizedError(AppError):
     http_status = 401
     code = 40101
@@ -35,11 +39,35 @@ class ForbiddenError(AppError):
     code = 40301
 
 
+class PermissionDeniedError(ForbiddenError):
+    """无权限（等价于 ForbiddenError，供权限校验场景使用）。"""
+
+
 class NotFoundError(AppError):
     http_status = 404
     code = 40401
 
 
+class ResourceNotFoundError(NotFoundError):
+    """资源不存在（等同 NotFoundError）。"""
+
+
 class ConflictError(AppError):
     http_status = 409
     code = 40901
+
+
+# 别名（按字母顺序，放在父类之后）
+class PermissionDeniedError(ForbiddenError):
+    """权限不足（403 别名）。"""
+    code = 40302
+
+
+class ResourceNotFoundError(NotFoundError):
+    """资源不存在（404 别名）。"""
+    code = 40402
+
+
+class ValidationError(BadRequestError):
+    """校验失败（400 别名）。"""
+    code = 40002

@@ -50,7 +50,9 @@ def create_account(
         current_balance=balance,
         remark=remark,
     )
-    return repo.create(account)
+    account = repo.create(account)
+    db.commit()
+    return account
 
 
 def get_account(db: Session, account_id: int) -> Account:

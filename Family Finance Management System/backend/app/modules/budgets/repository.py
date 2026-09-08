@@ -1,8 +1,13 @@
 """预算数据访问。"""
 
+from datetime import datetime
+from decimal import Decimal
+
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.modules.budgets.models import CategoryBudget, MonthlyBudget
+from app.modules.transactions.models import Transaction
 
 
 class BudgetRepository:
@@ -42,3 +47,43 @@ class BudgetRepository:
         self.db.add(cb)
         self.db.flush()
         return cb
+
+    def sum_expense(
+        self,
+        family_id: int,
+        start: datetime,
+        end: datetime,
+        beneficiary_member_id: int | None = None,
+    ) -> Decimal:
+        """汇总范围内支出总额（不含收入与转账，详见设计 9.3）。"""
+        q = self.db.query(func.coalesce(func.sum(Transaction.amount), 0)).filter(
+            Transaction.family_id == family_id,
+            Transaction.type == "EXPENSE",
+            Transaction.occurred_at >= start,
+            Transaction.occurred_at < end,
+        )
+        if beneficiary_member_id is not None:
+            q = q.filter(Transaction.beneficiary_member_id == beneficiary_member_id)
+        return Decimal(q.scalar() or 0)
+
+    def sum_expense_by_category(
+        self,
+        family_id: int,
+        start: datetime,
+        end: datetime,
+        beneficiary_member_id: int | None = None,
+    ) -> dict[int, Decimal]:
+        """按分类汇总范围内支出，返回 {category_id: 支出总额}。"""
+        q = self.db.query(
+            Transaction.category_id,
+            func.coalesce(func.sum(Transaction.amount), 0),
+        ).filter(
+            Transaction.family_id == family_id,
+            Transaction.type == "EXPENSE",
+            Transaction.occurred_at >= start,
+            Transaction.occurred_at < end,
+        )
+        if beneficiary_member_id is not None:
+            q = q.filter(Transaction.beneficiary_member_id == beneficiary_member_id)
+        rows = q.group_by(Transaction.category_id).all()
+        return {category_id: Decimal(amount) for category_id, amount in rows}

@@ -9,6 +9,8 @@ from app.core.deps import CurrentUser, DbSession
 from app.core.exceptions import BadRequestError
 from app.core.settings import get_settings
 from app.modules.imports.service import confirm_import, get_batch, preview_import
+from app.modules.imports.schemas import ImportRowsUpdate
+from app.modules.imports.service import update_import_rows
 
 router = APIRouter(prefix="/imports", tags=["导入"])
 
@@ -58,3 +60,9 @@ def confirm(batch_id: int, user: CurrentUser, db: DbSession):
     """确认导入，有效行写入流水并更新余额（整体事务，失败回滚）。"""
     result = confirm_import(db, batch_id, user.id)
     return ok(data=result, message="导入成功")
+
+
+@router.patch("/{batch_id}/rows", summary="保存导入预览行修改")
+def update_rows(batch_id: int, payload: ImportRowsUpdate, user: CurrentUser, db: DbSession):
+    result = update_import_rows(db, batch_id, user.id, [item.model_dump() for item in payload.rows])
+    return ok(data=result, message="预览修改已保存")

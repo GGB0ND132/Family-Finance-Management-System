@@ -7,7 +7,7 @@ class PreviewRow(BaseModel):
     """预览行。normalized_data 存储标准化后的字段（金额以字符串表示）。"""
 
     row_number: int
-    validation_status: str  # VALID / INVALID / DUPLICATE
+    validation_status: str  # VALID / INVALID / DUPLICATE / SKIPPED
     normalized_data: dict | None = None
     errors: list[str] = []
 
@@ -36,3 +36,12 @@ class ConfirmImportOut(BaseModel):
     batch_id: int
     status: str
     imported_rows: int
+
+
+class ImportRowUpdate(BaseModel):
+    row_number: int
+    normalized_data: dict
+
+
+class ImportRowsUpdate(BaseModel):
+    rows: list[ImportRowUpdate]

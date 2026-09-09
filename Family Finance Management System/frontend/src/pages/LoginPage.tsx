@@ -1,5 +1,6 @@
 import { LockOutlined, MailOutlined, WalletOutlined } from "@ant-design/icons";
-import { Button, Card, Checkbox, Form, Input, Typography } from "antd";
+import axios from "axios";
+import { Button, Card, Checkbox, Form, Input, Typography, message } from "antd";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../stores/authStore";
 import { authApi } from "../api/authApi";
@@ -15,26 +16,35 @@ interface LoginForm {
 export function LoginPage() {
   const navigate = useNavigate();
   const setSession = useAuthStore((state) => state.setSession);
+  const [messageApi, contextHolder] = message.useMessage();
 
   const handleFinish = async (values: LoginForm) => {
-    const response = await authApi.login({ username: values.account, password: values.password });
-    const result = response.data as ApiResponse<AuthTokenResponse>;
-    const data = result.data;
-    if (!data) return;
-    setSession(data.access_token, data.user);
-    let familyData: FamilySummary[] = [];
     try {
-      const families = (await familyApi.list()).data;
-      familyData = families.data ?? [];
-    } catch {
-      // 登录成功后即使家庭列表暂时不可用，也允许用户进入家庭设置页重试。
+      const response = await authApi.login({ username: values.account, password: values.password });
+      const result = response.data as ApiResponse<AuthTokenResponse>;
+      const data = result.data;
+      if (!data) return;
+      setSession(data.access_token, data.user);
+      let familyData: FamilySummary[] = [];
+      try {
+        const families = (await familyApi.list()).data;
+        familyData = families.data ?? [];
+      } catch {
+        // 登录成功后即使家庭列表暂时不可用，也允许用户进入家庭设置页重试。
+      }
+      if (familyData.length) useAuthStore.getState().setFamily(String(familyData[0].id));
+      navigate(familyData.length ? "/home?scope=personal" : "/family");
+    } catch (error: unknown) {
+      const detail = axios.isAxiosError(error) && typeof error.response?.data?.message === "string"
+        ? error.response.data.message
+        : undefined;
+      messageApi.error(detail || "用户名或密码错误");
     }
-    if (familyData.length) useAuthStore.getState().setFamily(String(familyData[0].id));
-    navigate(familyData.length ? "/home?scope=personal" : "/family");
   };
 
   return (
     <main className="login-page">
+      {contextHolder}
       <section className="login-intro" aria-labelledby="login-intro-title">
         <div className="login-intro__brand">
           <span className="brand-mark">

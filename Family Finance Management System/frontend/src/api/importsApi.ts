@@ -8,5 +8,6 @@ export const importApi = {
     return apiClient.post('/imports/preview', form, { headers: { 'Content-Type': 'multipart/form-data' } })
   },
   detail: (id: number | string) => apiClient.get(`/imports/${id}`),
+  updateRows: (id: number | string, rows: Array<{ row_number: number; normalized_data: Record<string, unknown> }>) => apiClient.patch(`/imports/${id}/rows`, { rows }),
   confirm: (id: number | string) => apiClient.post(`/imports/${id}/confirm`),
 }

@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 
 from app.common.money import quantize_money
 from app.core.exceptions import (
@@ -62,7 +63,9 @@ def preview_import(
     for idx, raw in enumerate(raw_rows):
         row_number = idx + 2  # 表头占第 1 行
         data, errors = _normalize_row(db, family_id, account, raw, mapping)
-        if errors and data is None:
+        if _is_non_cashflow_row(raw, mapping):
+            status = "SKIPPED"
+        elif errors:
             status = "INVALID"
             invalid += 1
         else:
@@ -118,6 +121,71 @@ def get_batch(db: Session, batch_id: int, user_id: int) -> dict:
     return _batch_out(batch)
 
 
+def update_import_rows(db: Session, batch_id: int, user_id: int, updates: list[dict]) -> dict:
+    """保存用户对预览行的补充，并重新计算有效/重复状态。"""
+    batch = ImportBatchRepository(db).get_by_id(batch_id)
+    if batch is None:
+        raise NotFoundError("批次不存在")
+    _ensure_access(db, batch, user_id)
+    if batch.status != "PREVIEWED":
+        raise BadRequestError("该批次已处理")
+
+    account = _ensure_account(db, batch.family_id, batch.account_id)
+    by_number = {int(row.get("row_number")): row for row in (batch.rows or [])}
+    for update in updates:
+        row_number = int(update.get("row_number", 0))
+        if row_number not in by_number:
+            raise BadRequestError(f"行号不存在: {row_number}")
+        if by_number[row_number].get("validation_status") == "SKIPPED":
+            continue
+        current = dict(by_number[row_number].get("normalized_data") or {})
+        current.update(update.get("normalized_data") or {})
+        current["beneficiary_member_id"] = account.owner_member_id
+        by_number[row_number]["normalized_data"] = current
+
+    existing_keys = _existing_dedup_keys(db, batch.family_id, batch.account_id)
+    seen_keys: set[str] = set()
+    valid = invalid = duplicate = 0
+    for row in by_number.values():
+        if row.get("validation_status") == "SKIPPED":
+            continue
+        data = row.get("normalized_data") or {}
+        errors = _validate_edited_row(db, batch.family_id, data)
+        if errors:
+            row["validation_status"] = "INVALID"
+            row["errors"] = errors
+            invalid += 1
+            continue
+        key = _dedup_key(batch.account_id, datetime.fromisoformat(data["occurred_at"]), Decimal(str(data["amount"])), data.get("remark") or "")
+        if key in existing_keys or key in seen_keys:
+            row["validation_status"] = "DUPLICATE"
+            row["errors"] = ["与已有流水重复" if key in existing_keys else "批次内重复"]
+            duplicate += 1
+        else:
+            row["validation_status"] = "VALID"
+            row["errors"] = []
+            seen_keys.add(key)
+            valid += 1
+        category = db.get(Category, data.get("category_id"))
+        if category:
+            data["category_name"] = category.name
+
+    batch.rows = [
+        {
+            **row,
+            "normalized_data": dict(row.get("normalized_data") or {}),
+            "errors": list(row.get("errors") or []),
+        }
+        for row in by_number.values()
+    ]
+    batch.valid_rows = valid
+    batch.invalid_rows = invalid
+    batch.duplicate_rows = duplicate
+    flag_modified(batch, "rows")
+    db.commit()
+    return _batch_out(batch)
+
+
 def confirm_import(db: Session, batch_id: int, user_id: int) -> dict:
     """确认导入：有效行批量写入流水并更新余额，失败整体回滚。"""
     repo = ImportBatchRepository(db)
@@ -139,9 +207,7 @@ def confirm_import(db: Session, batch_id: int, user_id: int) -> dict:
     confirmation_errors: list[str] = []
     for row in batch.rows or []:
         status = row.get("validation_status")
-        if status == "INVALID":
-            continue
-        if status == "DUPLICATE":
+        if status in {"INVALID", "DUPLICATE", "SKIPPED"}:
             continue
 
         data = row.get("normalized_data") or {}
@@ -231,10 +297,10 @@ def _complete_mapping(mapping: dict, headers) -> dict:
     result = dict(mapping)
     aliases = {
         "occurred_at": ["交易时间", "发生时间", "日期", "时间", "date", "time", "occurred_at"],
-        "amount": ["金额", "交易金额", "amount"],
+        "amount": ["金额", "金额(元)", "交易金额", "amount"],
         "direction": ["收/支", "收支", "类型", "方向", "direction", "type"],
-        "category": ["分类", "类别", "category"],
-        "remark": ["备注", "说明", "摘要", "memo", "note", "remark"],
+        "category": ["分类", "类别", "交易分类", "category"],
+        "remark": ["备注", "说明", "摘要", "商品说明", "商品", "memo", "note", "remark"],
     }
     header_map = {str(h).strip().lower(): h for h in headers}
     for key, names in aliases.items():
@@ -257,7 +323,7 @@ def _normalize_row(
     account: Account,
     raw: dict,
     mapping: dict,
-) -> tuple[dict | None, list[str]]:
+) -> tuple[dict, list[str]]:
     """把一行原始数据标准化为流水字段，返回 (标准化数据, 错误列表)。"""
     errors: list[str] = []
     date_col = _mapped_column(mapping, "occurred_at", "date", "time")
@@ -273,13 +339,13 @@ def _normalize_row(
     if raw_date is not None and str(raw_date).strip() != "":
         occurred_at, time_defaulted = _parse_datetime(str(raw_date))
     if occurred_at is None:
-        errors.append("日期格式无法识别" if raw_date else "缺少日期")
+        errors.append("日期格式无法识别" if raw_date else "缺少日期，请补充")
 
     # 金额
     amount = None
     raw_amount = _cell(raw, amount_col)
     if raw_amount is None or str(raw_amount).strip() == "":
-        errors.append("缺少金额")
+        errors.append("缺少金额，请补充")
     else:
         amount = _parse_amount(str(raw_amount))
         if amount is None:
@@ -302,41 +368,56 @@ def _normalize_row(
     # 分类（按名称匹配当前家庭同方向现用分类）
     category_id = None
     raw_category = _cell(raw, category_col)
-    if raw_category is None or str(raw_category).strip() == "":
-        errors.append("缺少分类")
-    else:
+    category = None
+    if raw_category is not None and str(raw_category).strip() != "":
         category = _resolve_category(db, family_id, str(raw_category), type_)
-        if category is None:
-            errors.append("分类不存在或方向不匹配")
-        else:
-            category_id = category.id
+    if category is None:
+        category = _infer_category(db, family_id, type_, raw)
+    if category is None:
+        errors.append("缺少分类，请补充")
+    else:
+        category_id = category.id
 
     # 备注（去首尾空白）
     remark = ""
     raw_remark = _cell(raw, remark_col)
     if raw_remark is not None and str(raw_remark).strip() != "":
         remark = str(raw_remark).strip()
-
-    if errors:
-        return None, errors
+    if not remark:
+        remark = _fallback_remark(raw) or "未知"
 
     return (
         {
-            "occurred_at": occurred_at.isoformat(),
+            "occurred_at": occurred_at.isoformat() if occurred_at else "未知",
             "type": type_,
-            "amount": str(quantize_money(amount)),
+            "amount": str(quantize_money(amount)) if amount is not None else "",
             "category_id": category_id,
+            "category_name": category.name if category else (str(raw_category).strip() if raw_category else "未知"),
             "remark": remark,
             "beneficiary_member_id": account.owner_member_id,
             "time_defaulted": time_defaulted,
         },
-        [],
+        errors,
     )
 
 
 def _validate_confirmed_row(db: Session, family_id: int, data: dict) -> list[str]:
     """确认前再次校验分类与资金归属人仍然有效。"""
     errors: list[str] = []
+    if not data.get("occurred_at") or data.get("occurred_at") == "未知":
+        errors.append("发生时间未补充")
+    else:
+        try:
+            datetime.fromisoformat(str(data["occurred_at"]))
+        except ValueError:
+            errors.append("发生时间格式非法")
+    try:
+        if not data.get("amount") or Decimal(str(data["amount"])) <= 0:
+            errors.append("金额必须大于 0")
+    except Exception:
+        errors.append("金额格式非法")
+    if data.get("type") not in {"INCOME", "EXPENSE"}:
+        errors.append("收支方向无法识别")
     category = db.get(Category, data.get("category_id"))
     if category is None or category.deleted_at is not None:
         errors.append("分类不存在或已删除")
@@ -348,6 +429,13 @@ def _validate_confirmed_row(db: Session, family_id: int, data: dict) -> list[str
     member = db.get(FamilyMember, data.get("beneficiary_member_id"))
     if member is None or member.family_id != family_id:
         errors.append("资金归属人无效")
+    return errors
+
+
+def _validate_edited_row(db: Session, family_id: int, data: dict) -> list[str]:
+    errors = _validate_confirmed_row(db, family_id, data)
+    if not data.get("category_id"):
+        errors.append("分类未补充")
     return errors
 
 
@@ -495,6 +583,56 @@ def _resolve_category(db: Session, family_id: int, name: str, type_: str | None)
         )
         .first()
     )
+
+
+def _is_non_cashflow_row(raw: dict, mapping: dict) -> bool:
+    value = _cell(raw, _mapped_column(mapping, "direction", "type"))
+    text = str(value or "").strip()
+    transaction_kind = str(raw.get("交易类型") or "").strip()
+    return text in {"不计收支", "中性交易", "中性"} or transaction_kind in {
+        "零钱提现", "零钱充值", "充值", "提现", "理财通购买", "零钱通存取", "信用卡还款"
+    }
+
+
+def _infer_category(db: Session, family_id: int, type_: str | None, raw: dict):
+    if type_ is None:
+        return None
+    text = " ".join(str(value or "") for value in raw.values()).lower()
+    keyword_groups = {
+        "餐饮": ("餐", "美食", "外卖", "吃", "饭", "奶茶", "咖啡"),
+        "交通": ("交通", "公交", "地铁", "打车", "滴滴", "高铁", "火车", "加油"),
+        "住宿": ("住宿", "酒店", "民宿"),
+        "医疗": ("医疗", "医院", "药", "诊所"),
+        "娱乐": ("娱乐", "游戏", "电影", "音乐"),
+        "住房": ("住房", "房租", "水费", "电费", "燃气"),
+        "购物": ("购物", "百货", "超市", "便利", "京东", "淘宝", "天猫", "数码", "电器", "商城", "商品"),
+    }
+    if type_ == "INCOME":
+        preferred = ("工资", "奖金", "收款", "借入")
+    else:
+        preferred = tuple(keyword_groups)
+    categories = db.query(Category).filter(
+        Category.family_id == family_id,
+        Category.type == type_,
+        Category.deleted_at.is_(None),
+    ).all()
+    for name in preferred:
+        if name in text:
+            match = next((item for item in categories if item.name == name), None)
+            if match:
+                return match
+    if type_ == "INCOME":
+        return next((item for item in categories if item.name == "收款"), None)
+    return next((item for item in categories if item.name == "购物"), None)
+
+
+def _fallback_remark(raw: dict) -> str:
+    values = []
+    for key in ("交易对方", "商品", "商品说明", "说明", "摘要"):
+        value = raw.get(key)
+        if value and str(value).strip() not in {"/", "-"}:
+            values.append(str(value).strip())
+    return " - ".join(dict.fromkeys(values))[:500]
 
 
 def _batch_out(batch: ImportBatch) -> dict:

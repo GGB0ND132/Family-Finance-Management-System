@@ -33,7 +33,8 @@ def parse_occurred_at(value: str) -> datetime:
         raise BadRequestError("发生时间格式非法，需为 ISO 8601 格式") from exc
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
-    return dt
+    # 转账发生时间统一按分钟保存
+    return dt.replace(second=0, microsecond=0)
 
 
 def _resolve_member(db: Session, family_id: int, user_id: int) -> FamilyMember:
@@ -109,8 +110,6 @@ def create_transfer(
     if member.role != "ADMIN" and from_account.owner_member_id != member.id:
         raise ForbiddenError("普通成员只能以本人账户作为转出账户")
 
-    _apply_balance(from_account, to_account, dec_amount)
-
     transfer = Transfer(
         family_id=family_id,
         from_account_id=from_account_id,
@@ -121,7 +120,10 @@ def create_transfer(
         amount=dec_amount,
         occurred_at=occurred,
         remark=remark,
+        status="CONFIRMED" if from_account.owner_member_id == to_account.owner_member_id else "PENDING_CONFIRM",
     )
+    if transfer.status == "CONFIRMED":
+        _apply_balance(from_account, to_account, dec_amount)
     transfer = TransferRepository(db).create(transfer)
     db.commit()
     return transfer
@@ -174,7 +176,8 @@ def update_transfer(db: Session, user: User, transfer_id: int, **fields) -> Tran
     if member.role != "ADMIN" and new_from.owner_member_id != member.id:
         raise ForbiddenError("普通成员只能以本人账户作为转出账户")
 
-    _reverse_balance(old_from, old_to, transfer.amount)
+    if transfer.status == "CONFIRMED":
+        _reverse_balance(old_from, old_to, transfer.amount)
 
     transfer.from_account_id = new_from_id
     transfer.to_account_id = new_to_id
@@ -185,7 +188,9 @@ def update_transfer(db: Session, user: User, transfer_id: int, **fields) -> Tran
     if "remark" in fields and fields["remark"] is not None:
         transfer.remark = fields["remark"]
 
-    _apply_balance(new_from, new_to, new_amount)
+    transfer.status = "CONFIRMED" if new_from.owner_member_id == new_to.owner_member_id else "PENDING_CONFIRM"
+    if transfer.status == "CONFIRMED":
+        _apply_balance(new_from, new_to, new_amount)
     db.flush()
     db.commit()
     return transfer
@@ -210,7 +215,8 @@ def delete_transfer(db: Session, user: User, transfer_id: int) -> None:
     if not _can_maintain(member, transfer):
         raise ForbiddenError("无权删除该转账")
 
-    _reverse_balance(from_account, to_account, transfer.amount)
+    if transfer.status == "CONFIRMED":
+        _reverse_balance(from_account, to_account, transfer.amount)
     repo.delete(transfer)
     db.commit()
 
@@ -279,4 +285,20 @@ def _build_out(db: Session, transfer: Transfer) -> dict:
         from_member_nickname=from_user.nickname if from_user else None,
         to_member_nickname=to_user.nickname if to_user else None,
         recorder_nickname=recorder_user.nickname if recorder_user else None,
+        status=transfer.status,
     ).model_dump()
+
+
+def confirm_transfer(db: Session, user: User, transfer_id: int) -> Transfer:
+    transfer = get_transfer(db, user, transfer_id)
+    member = _resolve_member(db, transfer.family_id, user.id)
+    if transfer.status != "PENDING_CONFIRM":
+        raise BadRequestError("该转账无需确认")
+    if member.id != transfer.to_member_id:
+        raise ForbiddenError("仅转入方成员可以确认该转账")
+    ordered_ids = sorted([transfer.from_account_id, transfer.to_account_id])
+    accounts = {aid: _lock_and_validate_account(db, transfer.family_id, aid) for aid in ordered_ids}
+    _apply_balance(accounts[transfer.from_account_id], accounts[transfer.to_account_id], transfer.amount)
+    transfer.status = "CONFIRMED"
+    db.commit()
+    return transfer

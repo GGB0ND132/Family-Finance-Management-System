@@ -1,5 +1,33 @@
 import { apiClient } from './client'
-import type { FinanceTransaction } from '../data/financeData'
-import type { TransactionQuery } from './contracts'
-export const transactionApi = { list: (params?: TransactionQuery) => apiClient.get<FinanceTransaction[]>('/transactions', { params }), create: (payload: Omit<FinanceTransaction, 'id' | 'createdAt'>) => apiClient.post<FinanceTransaction>('/transactions', payload), update: (id: string, payload: Partial<FinanceTransaction>) => apiClient.patch<FinanceTransaction>(`/transactions/${id}`, payload), remove: (id: string) => apiClient.delete<void>(`/transactions/${id}`), export: (params?: TransactionQuery & { format?: 'csv' | 'xlsx' }) => apiClient.get('/exports/transactions', { params, responseType: 'blob' }) }
-export function downloadTransactionsCsv(transactions: FinanceTransaction[]) { const csv = `\uFEFF日期,类型,金额,账户,分类,资金归属人,录入人,备注\n${transactions.map((t) => [t.occurredAt, t.type, t.amount.toFixed(2), t.accountId, t.categoryId, t.beneficiaryMemberId, t.recorderUserId, t.remark].map((v) => `"${String(v).replaceAll('"', '""')}"`).join(',')).join('\n')}`; const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })); const anchor = document.createElement('a'); anchor.href = url; anchor.download = `family-transactions-${new Date().toISOString().slice(0, 10)}.csv`; anchor.click(); URL.revokeObjectURL(url) }
+import type { ApiResponse, PageData, TransactionQuery, TransactionResponse } from './contracts'
+
+export interface CreateTransactionPayload {
+  family_id: number
+  account_id: number
+  category_id: number
+  beneficiary_member_id: number | string
+  type: 'INCOME' | 'EXPENSE'
+  amount: string
+  occurred_at: string
+  remark?: string
+}
+
+export const transactionApi = {
+  list: (params: TransactionQuery) => apiClient.get<ApiResponse<PageData<TransactionResponse>>>('/transactions', { params }),
+  create: (payload: CreateTransactionPayload) => apiClient.post<ApiResponse<TransactionResponse>>('/transactions', payload),
+  update: (id: number, payload: Partial<Omit<CreateTransactionPayload, 'family_id' | 'type'>>) => apiClient.patch<ApiResponse<TransactionResponse>>(`/transactions/${id}`, payload),
+  confirm: (id: number) => apiClient.post<ApiResponse<TransactionResponse>>(`/transactions/${id}/confirm`),
+  remove: (id: number) => apiClient.delete<void>(`/transactions/${id}`),
+  export: (params: TransactionQuery & { format: 'csv' | 'xlsx' }) => apiClient.get('/exports/transactions', { params, responseType: 'blob' }),
+}
+
+export async function downloadBlob(response: { data: Blob }, filename: string) {
+  const url = URL.createObjectURL(response.data)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = filename
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+  URL.revokeObjectURL(url)
+}

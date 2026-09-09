@@ -8,8 +8,10 @@ from app.db.base import Base
 
 # 导入模型模块以注册 metadata（Alembic 自动生成迁移需要）
 import app.modules.accounts.models  # noqa: F401
+import app.modules.budgets.models  # noqa: F401
 import app.modules.categories.models  # noqa: F401
 import app.modules.families.models  # noqa: F401
+import app.modules.imports.models  # noqa: F401
 import app.modules.transactions.models  # noqa: F401
 import app.modules.transfers.models  # noqa: F401
 import app.modules.users.models  # noqa: F401

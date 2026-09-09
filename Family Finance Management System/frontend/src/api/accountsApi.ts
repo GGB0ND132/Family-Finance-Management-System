@@ -1,10 +1,10 @@
 import { apiClient } from './client'
-import type { Account } from '../data/financeData'
-import type { AccountPayload, AccountResponse } from './contracts'
+import type { AccountType } from '../data/financeData'
+import type { AccountPayload, AccountResponse, ApiResponse, PageData } from './contracts'
 
 export const accountApi = {
-  list: (familyId?: string, ownerMemberId?: string) => apiClient.get<AccountResponse[]>('/accounts', { params: { family_id: familyId, owner_member_id: ownerMemberId } }),
-  create: (payload: AccountPayload) => apiClient.post<AccountResponse>('/accounts', payload),
-  update: (id: string, payload: Partial<Pick<Account, 'name' | 'type' | 'ownerMemberId' | 'remark'>>) => apiClient.patch<AccountResponse>(`/accounts/${id}`, payload),
-  remove: (id: string) => apiClient.delete<void>(`/accounts/${id}`),
+  list: (params: { family_id: number; scope?: 'personal' | 'family'; owner_member_id?: number; include_closed?: boolean; page?: number; page_size?: number }) => apiClient.get<ApiResponse<PageData<AccountResponse>>>('/accounts', { params }),
+  create: (payload: AccountPayload) => apiClient.post<ApiResponse<AccountResponse>>('/accounts', payload),
+  update: (id: number, payload: { name?: string; type?: AccountType; owner_member_id?: number; remark?: string | null }) => apiClient.patch<ApiResponse<AccountResponse>>(`/accounts/${id}`, payload),
+  remove: (id: number) => apiClient.delete<void>(`/accounts/${id}`),
 }

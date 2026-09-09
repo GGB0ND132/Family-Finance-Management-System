@@ -34,7 +34,8 @@ def parse_occurred_at(value: str) -> datetime:
         raise BadRequestError("发生时间格式非法，需为 ISO 8601 格式") from exc
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
-    return dt
+    # 业务精度统一到分钟，避免秒/微秒导致筛选和去重口径不一致
+    return dt.replace(second=0, microsecond=0)
 
 
 def _resolve_member(db: Session, family_id: int, user_id: int) -> FamilyMember:
@@ -166,6 +167,12 @@ def update_transaction(db: Session, user: User, tx_id: int, **fields) -> Transac
     if not tx:
         raise NotFoundError("流水不存在")
     member = _resolve_member(db, tx.family_id, user.id)
+    beneficiary = db.get(FamilyMember, tx.beneficiary_member_id)
+    if member.role == "ADMIN" and beneficiary and beneficiary.role == "MEMBER" and beneficiary.user_id != member.user_id:
+        tx.pending_update = fields
+        tx.status = "PENDING_CONFIRM"
+        db.commit()
+        return tx
 
     old_account_id = tx.account_id
     new_account_id = fields.get("account_id") or old_account_id
@@ -297,4 +304,22 @@ def _build_out(db: Session, tx: Transaction) -> dict:
         category_type=category.type if category else None,
         beneficiary_nickname=beneficiary_user.nickname if beneficiary_user else None,
         recorder_nickname=recorder_user.nickname if recorder_user else None,
+        status=tx.status,
+        pending_update=tx.pending_update,
     ).model_dump()
+
+
+def confirm_transaction(db: Session, user: User, tx_id: int) -> Transaction:
+    tx = TransactionRepository(db).get_by_id(tx_id)
+    if not tx:
+        raise NotFoundError("流水不存在")
+    member = _resolve_member(db, tx.family_id, user.id)
+    if tx.status != "PENDING_CONFIRM" or not tx.pending_update:
+        raise BadRequestError("该流水无需确认")
+    if tx.beneficiary_member_id != member.id:
+        raise ForbiddenError("仅资金归属人可以确认该修改")
+    fields = dict(tx.pending_update)
+    tx.pending_update = None
+    tx.status = "CONFIRMED"
+    db.flush()
+    return update_transaction(db, user, tx_id, **fields)

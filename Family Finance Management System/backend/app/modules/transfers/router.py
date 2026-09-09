@@ -16,6 +16,7 @@ from app.modules.transfers.service import (
     list_transfers,
     parse_occurred_at,
     update_transfer,
+    confirm_transfer,
 )
 
 router = APIRouter(prefix="/transfers", tags=["转账"])
@@ -98,3 +99,8 @@ def api_update_transfer(
 @router.delete("/{transfer_id}", summary="删除转账", status_code=204)
 def api_delete_transfer(transfer_id: int, db: DbSession, user: CurrentUser):
     delete_transfer(db, user, transfer_id)
+
+
+@router.post("/{transfer_id}/confirm", summary="转入方确认转账")
+def api_confirm_transfer(transfer_id: int, db: DbSession, user: CurrentUser):
+    return ok(data=_build_out(db, confirm_transfer(db, user, transfer_id)), message="转账已确认")

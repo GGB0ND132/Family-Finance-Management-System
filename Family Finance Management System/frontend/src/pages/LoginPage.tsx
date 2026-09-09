@@ -30,7 +30,7 @@ export function LoginPage() {
       // 登录成功后即使家庭列表暂时不可用，也允许用户进入家庭设置页重试。
     }
     if (familyData.length) useAuthStore.getState().setFamily(String(familyData[0].id));
-    navigate(familyData.length ? "/personal" : "/family");
+    navigate(familyData.length ? "/home?scope=personal" : "/family");
   };
 
   return (

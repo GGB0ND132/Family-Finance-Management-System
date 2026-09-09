@@ -36,6 +36,7 @@ class Transfer(Base):
         DateTime(timezone=True), nullable=False
     )
     remark: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="CONFIRMED")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

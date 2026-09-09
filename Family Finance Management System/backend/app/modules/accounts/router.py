@@ -32,6 +32,7 @@ def api_list_accounts(
     family_id: int = Query(..., description="家庭 ID"),
     scope: str = Query("family", description="personal | family"),
     owner_member_id: int | None = Query(None, description="按所属成员筛选（family 范围可选）"),
+    include_closed: bool = Query(False, description="是否包含已销户账户"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
@@ -51,6 +52,7 @@ def api_list_accounts(
         db,
         family_id=family_id,
         owner_member_id=repo_owner_id,
+        include_closed=include_closed,
         page=page,
         page_size=page_size,
     )

@@ -64,3 +64,5 @@ class TransactionOut(BaseModel):
     category_type: str | None = None
     beneficiary_nickname: str | None = None
     recorder_nickname: str | None = None
+    status: str = "CONFIRMED"
+    pending_update: dict | None = None

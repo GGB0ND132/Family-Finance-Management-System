@@ -18,16 +18,15 @@ def export_transactions(
     from_date: str | None = Query(None, alias="from"),
     to_date: str | None = Query(None, alias="to"),
     format: str = Query("csv", pattern="^(csv|xlsx)$"),
+    type: str | None = Query(None, pattern="^(INCOME|EXPENSE)$"),
+    account_id: int | None = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """导出流水为 CSV 或 XLSX。
-
-    TODO: 重新执行家庭和范围权限过滤。
-    """
+    """导出流水为 CSV 或 XLSX，并按当前用户的家庭权限过滤。"""
     if format == "csv":
         output = export_transactions_csv(
-            db, family_id, scope=scope, from_date=from_date, to_date=to_date
+            db, family_id, scope=scope, from_date=from_date, to_date=to_date, user_id=current_user.id, type_=type, account_id=account_id
         )
         filename = f"transactions-export.csv"
         return StreamingResponse(
@@ -39,7 +38,7 @@ def export_transactions(
         )
     else:
         output = export_transactions_xlsx(
-            db, family_id, scope=scope, from_date=from_date, to_date=to_date
+            db, family_id, scope=scope, from_date=from_date, to_date=to_date, user_id=current_user.id, type_=type, account_id=account_id
         )
         filename = f"transactions-export.xlsx"
         return StreamingResponse(

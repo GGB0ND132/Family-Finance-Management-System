@@ -20,6 +20,8 @@ def create_family(db: Session, user: User, name: str) -> Family:
     """创建家庭，并在同一事务中写入创建者的管理员成员记录（详细设计 3.3）。"""
     family = family_repo.create_family(db, name.strip(), user.id)
     family_repo.add_member(db, family.id, user.id, MemberRole.ADMIN)
+    from app.modules.categories.service import ensure_default_categories
+    ensure_default_categories(db, family.id)
     db.commit()
     db.refresh(family)
     return family

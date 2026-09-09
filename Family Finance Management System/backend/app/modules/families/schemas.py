@@ -35,6 +35,7 @@ class MemberOut(BaseModel):
     user_id: int
     username: str
     nickname: str
+    avatar: str | None = None
     role: MemberRole
     joined_at: datetime
 

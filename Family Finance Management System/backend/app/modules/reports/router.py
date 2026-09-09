@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.common.response import ApiResponse, ok
-from app.core.deps import get_current_user, get_db
+from app.core.deps import get_current_user, get_db, require_family_member
 from app.modules.reports.service import (
     get_family_by_category,
     get_family_by_member,
@@ -29,9 +29,9 @@ def personal_daily(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """个人日报。TODO: 获取当前成员 ID 作为 beneficiary_member_id。"""
-    # TODO: 从家庭成员关系获取 beneficiary_member_id
-    result = get_personal_daily(db, family_id, current_user.id, date)
+    """个人日报，成员身份从当前登录用户解析。"""
+    member = require_family_member(db, current_user, family_id)
+    result = get_personal_daily(db, family_id, member.id, date)
     return ok(data=result)
 
 
@@ -43,7 +43,8 @@ def personal_summary(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    result = get_personal_summary(db, family_id, current_user.id, from_date, to_date)
+    member = require_family_member(db, current_user, family_id)
+    result = get_personal_summary(db, family_id, member.id, from_date, to_date)
     return ok(data=result)
 
 
@@ -55,7 +56,8 @@ def personal_trend(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    result = get_personal_trend(db, family_id, current_user.id, from_month, to_month)
+    member = require_family_member(db, current_user, family_id)
+    result = get_personal_trend(db, family_id, member.id, from_month, to_month)
     return ok(data=result)
 
 
@@ -66,7 +68,8 @@ def personal_by_category(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    result = get_personal_by_category(db, family_id, current_user.id, month)
+    member = require_family_member(db, current_user, family_id)
+    result = get_personal_by_category(db, family_id, member.id, month)
     return ok(data=result)
 
 
@@ -79,6 +82,7 @@ def family_summary(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    require_family_member(db, current_user, family_id)
     result = get_family_summary(db, family_id, month)
     return ok(data=result)
 
@@ -91,6 +95,7 @@ def family_trend(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    require_family_member(db, current_user, family_id)
     result = get_family_trend(db, family_id, from_month, to_month)
     return ok(data=result)
 
@@ -102,6 +107,7 @@ def family_by_category(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    require_family_member(db, current_user, family_id)
     result = get_family_by_category(db, family_id, month)
     return ok(data=result)
 
@@ -113,5 +119,6 @@ def family_by_member(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    require_family_member(db, current_user, family_id)
     result = get_family_by_member(db, family_id, month)
     return ok(data=result)

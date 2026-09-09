@@ -35,20 +35,25 @@ def preview_import(
     account_id: int,
     uploader_user_id: int,
     field_mapping: dict | None = None,
+    scope: str = "family",
 ) -> dict:
     """上传文件并生成预览批次。
 
     校验扩展名、必要列、日期、金额、方向和账户后，逐行标记
     VALID / INVALID / DUPLICATE，并持久化一个 PREVIEWED 批次。
     """
-    _ensure_member(db, family_id, uploader_user_id)
+    member = _ensure_member(db, family_id, uploader_user_id)
     account = _ensure_account(db, family_id, account_id)
+    if scope not in {"personal", "family"}:
+        raise BadRequestError("scope 仅支持 personal 或 family")
+    if scope == "personal" and account.owner_member_id != member.id:
+        raise ForbiddenError("个人范围只能导入到本人账户")
 
-    mapping = field_mapping or {}
     raw_rows = parse_file(file_bytes, filename)
     if not raw_rows:
         raise BadRequestError("文件中没有可导入的数据行")
 
+    mapping = _complete_mapping(field_mapping or {}, raw_rows[0].keys())
     existing_keys = _existing_dedup_keys(db, family_id, account_id)
     seen_keys: set[str] = set()
 
@@ -131,6 +136,7 @@ def confirm_import(db: Session, batch_id: int, user_id: int) -> dict:
     seen_keys: set[str] = set()
     to_import: list[dict] = []
 
+    confirmation_errors: list[str] = []
     for row in batch.rows or []:
         status = row.get("validation_status")
         if status == "INVALID":
@@ -141,6 +147,7 @@ def confirm_import(db: Session, batch_id: int, user_id: int) -> dict:
         data = row.get("normalized_data") or {}
         errors = _validate_confirmed_row(db, batch.family_id, data)
         if errors:
+            confirmation_errors.extend(errors)
             continue
 
         key = _dedup_key(
@@ -154,6 +161,10 @@ def confirm_import(db: Session, batch_id: int, user_id: int) -> dict:
         seen_keys.add(key)
         to_import.append(data)
 
+    if confirmation_errors:
+        batch.status = "FAILED"
+        db.commit()
+        raise BadRequestError("确认时发现无效行: " + "、".join(sorted(set(confirmation_errors))), code=40020)
     if not to_import:
         raise BadRequestError("没有可导入的有效行", code=40020)
 
@@ -175,9 +186,11 @@ def confirm_import(db: Session, batch_id: int, user_id: int) -> dict:
 # --------------------------------------------------------------------------
 
 
-def _ensure_member(db: Session, family_id: int, user_id: int) -> None:
-    if get_member_by_user(db, family_id, user_id) is None:
+def _ensure_member(db: Session, family_id: int, user_id: int):
+    member = get_member_by_user(db, family_id, user_id)
+    if member is None:
         raise ForbiddenError("你不是该家庭的成员")
+    return member
 
 
 def _ensure_account(db: Session, family_id: int, account_id: int) -> Account:
@@ -211,6 +224,27 @@ def _mapped_column(mapping: dict, *aliases: str) -> str | None:
         if col:
             return col
     return None
+
+
+def _complete_mapping(mapping: dict, headers) -> dict:
+    """补齐常见中文/英文表头映射，允许前端只传自定义字段。"""
+    result = dict(mapping)
+    aliases = {
+        "occurred_at": ["交易时间", "发生时间", "日期", "时间", "date", "time", "occurred_at"],
+        "amount": ["金额", "交易金额", "amount"],
+        "direction": ["收/支", "收支", "类型", "方向", "direction", "type"],
+        "category": ["分类", "类别", "category"],
+        "remark": ["备注", "说明", "摘要", "memo", "note", "remark"],
+    }
+    header_map = {str(h).strip().lower(): h for h in headers}
+    for key, names in aliases.items():
+        if result.get(key):
+            continue
+        for name in names:
+            if name.lower() in header_map:
+                result[key] = header_map[name.lower()]
+                break
+    return result
 
 
 def _cell(raw: dict, col: str | None):
@@ -368,9 +402,9 @@ def _write_transactions(db: Session, batch: ImportBatch, account: Account, to_im
         )
         db.add(tx)
         if data["type"] == "INCOME":
-            locked_account.current_balance += amount
+            locked_account.current_balance = quantize_money(locked_account.current_balance + amount)
         else:
-            locked_account.current_balance -= amount
+            locked_account.current_balance = quantize_money(locked_account.current_balance - amount)
         imported += 1
     db.flush()
     return imported
@@ -390,7 +424,7 @@ def _mark_failed(db: Session, batch_id: int) -> None:
 
 def _file_type(filename: str) -> str:
     ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
-    return "XLSX" if ext in ("xls", "xlsx") else "CSV"
+    return "XLSX" if ext == "xlsx" else "CSV"
 
 
 def _parse_datetime(value: str) -> tuple[datetime | None, bool]:

@@ -1,195 +1,28 @@
-import {
-  ArrowDownOutlined,
-  ArrowUpOutlined,
-  PlusOutlined,
-  SwapOutlined,
-  WalletOutlined,
-} from "@ant-design/icons";
-import {
-  Button,
-  Card,
-  Col,
-  Empty,
-  Row,
-  Space,
-  Statistic,
-  Table,
-  Typography,
-} from "antd";
-import type { TableColumnsType } from "antd";
-import { useNavigate } from "react-router-dom";
-import {
-  demoMonth,
-  formatCurrency,
-  today,
-  type FinanceTransaction,
-} from "../data/financeData";
-import { useFinanceStore } from "../stores/financeStore";
-import {
-  accountLabel,
-  categoryLabel,
-  signedAmount,
-  typeTag,
-} from "./pageUtils";
+import { ArrowDownOutlined, ArrowUpOutlined, PlusOutlined, SwapOutlined, WalletOutlined } from '@ant-design/icons'
+import { Alert, Button, Card, Col, DatePicker, Empty, Row, Skeleton, Space, Statistic, Table, Typography } from 'antd'
+import dayjs from 'dayjs'
+import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { accountApi } from '../api/accountsApi'
+import { familyApi } from '../api/familiesApi'
+import { reportApi } from '../api/reportsApi'
+import { transactionApi } from '../api/transactionsApi'
+import { transferApi } from '../api/transfersApi'
+import type { AccountResponse, TransactionResponse, TransferResponse } from '../api/contracts'
+import { useAuthStore } from '../stores/authStore'
+import { HomeScopeToggle } from '../components/HomeScopeToggle'
+
+const money = (value: number) => new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY' }).format(value)
+const signed = (type: string, amount: string) => <span className={`amount amount--${type === 'INCOME' ? 'income' : 'expense'}`}>{type === 'INCOME' ? '+' : '-'}{money(Number(amount))}</span>
 
 export function PersonalPage() {
-  const navigate = useNavigate();
-  const { transactions, transfers, accounts, categories } = useFinanceStore();
-  const memberId = "member-zhang";
-  const todayTransactions = transactions.filter(
-    (t) => t.occurredAt === today && t.beneficiaryMemberId === memberId,
-  );
-  const income = todayTransactions
-    .filter((t) => t.type === "INCOME")
-    .reduce((s, t) => s + t.amount, 0);
-  const expense = todayTransactions
-    .filter((t) => t.type === "EXPENSE")
-    .reduce((s, t) => s + t.amount, 0);
-  const transferIn = transfers
-    .filter((t) => t.toMemberId === memberId && t.occurredAt === today)
-    .reduce((s, t) => s + t.amount, 0);
-  const transferOut = transfers
-    .filter((t) => t.fromMemberId === memberId && t.occurredAt === today)
-    .reduce((s, t) => s + t.amount, 0);
-  const assets = accounts
-    .filter((a) => a.ownerMemberId === memberId && !a.closedAt)
-    .reduce((s, a) => s + a.currentBalance, 0);
-  const columns: TableColumnsType<FinanceTransaction> = [
-    { title: "日期", dataIndex: "occurredAt", width: 110 },
-    { title: "类型", render: (_, t) => typeTag(t.type) },
-    {
-      title: "分类",
-      render: (_, t) => categoryLabel(t.categoryId, categories),
-    },
-    { title: "账户", render: (_, t) => accountLabel(t.accountId, accounts) },
-    {
-      title: "金额",
-      align: "right",
-      render: (_, t) => signedAmount(t.type, t.amount),
-    },
-  ];
-  return (
-    <div className="page">
-      <div className="page-heading">
-        <div>
-          <Typography.Title level={2}>个人首页</Typography.Title>
-          <Typography.Text>
-            只看归属于张三的收支与资产，转账单独统计。
-          </Typography.Text>
-        </div>
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          onClick={() => navigate("/transactions?create=1")}
-        >
-          记一笔
-        </Button>
-      </div>
-      <Row gutter={[16, 16]} className="summary-grid">
-        <Col xs={24} sm={12} xl={6}>
-          <Card className="summary-card summary-card--income">
-            <Statistic
-              title="今日收入"
-              value={income}
-              formatter={(v) => formatCurrency(Number(v))}
-              prefix={
-                <span className="summary-icon">
-                  <ArrowUpOutlined />
-                </span>
-              }
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} xl={6}>
-          <Card className="summary-card summary-card--expense">
-            <Statistic
-              title="今日支出"
-              value={expense}
-              formatter={(v) => formatCurrency(Number(v))}
-              prefix={
-                <span className="summary-icon">
-                  <ArrowDownOutlined />
-                </span>
-              }
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} xl={6}>
-          <Card className="summary-card">
-            <Statistic
-              title="今日转账"
-              value={transferIn + transferOut}
-              formatter={(v) => formatCurrency(Number(v))}
-              prefix={
-                <span className="summary-icon">
-                  <SwapOutlined />
-                </span>
-              }
-            />
-            <span className="summary-card__hint">
-              转入 {formatCurrency(transferIn)} · 转出{" "}
-              {formatCurrency(transferOut)}
-            </span>
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} xl={6}>
-          <Card className="summary-card">
-            <Statistic
-              title="个人资产"
-              value={assets}
-              formatter={(v) => formatCurrency(Number(v))}
-              prefix={
-                <span className="summary-icon">
-                  <WalletOutlined />
-                </span>
-              }
-            />
-            <span className="summary-card__hint">未销户账户余额合计</span>
-          </Card>
-        </Col>
-      </Row>
-      <Row gutter={[16, 16]} className="dashboard-row">
-        <Col xs={24} lg={15}>
-          <Card
-            className="data-card"
-            title="今日收支明细"
-            extra={
-              <Button type="link" onClick={() => navigate("/transactions")}>
-                查看全部
-              </Button>
-            }
-          >
-            {todayTransactions.length ? (
-              <Table
-                rowKey="id"
-                columns={columns}
-                dataSource={todayTransactions}
-                pagination={false}
-                scroll={{ x: 620 }}
-              />
-            ) : (
-              <Empty description="今天还没有归属于你的收支" />
-            )}
-          </Card>
-        </Col>
-        <Col xs={24} lg={9}>
-          <Card className="data-card" title={`${demoMonth} 资产账户`}>
-            <Space direction="vertical" className="full-width" size={12}>
-              {accounts
-                .filter((a) => a.ownerMemberId === memberId && !a.closedAt)
-                .map((a) => (
-                  <div className="report-category-row" key={a.id}>
-                    <span>
-                      <WalletOutlined />
-                      {a.name}
-                    </span>
-                    <strong>{formatCurrency(a.currentBalance)}</strong>
-                  </div>
-                ))}
-            </Space>
-          </Card>
-        </Col>
-      </Row>
-    </div>
-  );
+  const navigate = useNavigate(); const familyId = useAuthStore((s) => s.familyId); const user = useAuthStore((s) => s.user)
+  const [date, setDate] = useState(dayjs().format('YYYY-MM-DD')); const [items, setItems] = useState<TransactionResponse[]>([]); const [accounts, setAccounts] = useState<AccountResponse[]>([]); const [transfers, setTransfers] = useState<TransferResponse[]>([]); const [memberId, setMemberId] = useState<number | null>(null); const [summary, setSummary] = useState<{ income: number; expense: number; assets: number } | null>(null); const [loading, setLoading] = useState(false); const [error, setError] = useState('')
+  useEffect(() => {
+    if (!familyId) return; const id = Number(familyId); setLoading(true); setError('')
+    Promise.all([transactionApi.list({ family_id: familyId, scope: 'personal', from: `${date}T00:00`, to: `${date}T23:59`, page: 1, page_size: 100 }), accountApi.list({ family_id: id, scope: 'personal', include_closed: false, page: 1, page_size: 100 }), transferApi.list({ family_id: id, scope: 'personal', from: `${date}T00:00`, to: `${date}T23:59`, page: 1, page_size: 100 }), reportApi.personalDaily({ family_id: id, date }), familyApi.members(familyId)]).then(([tx, ac, tr, rp, fm]) => { setItems(tx.data.data?.items ?? []); setAccounts(ac.data.data?.items ?? []); setTransfers(tr.data.data?.items ?? []); const current = fm.data.data?.find((m) => String(m.user_id) === String(user?.id)); setMemberId(current ? Number(current.id) : null); const s = rp.data.data; setSummary(s ? { income: Number(s.income), expense: Number(s.expense), assets: Number(s.assets ?? 0) } : null) }).catch(() => setError('个人首页数据加载失败，请稍后重试')).finally(() => setLoading(false))
+  }, [familyId, date, user?.id])
+  const income = summary?.income ?? items.filter((x) => x.type === 'INCOME').reduce((sum, x) => sum + Number(x.amount), 0); const expense = summary?.expense ?? items.filter((x) => x.type === 'EXPENSE').reduce((sum, x) => sum + Number(x.amount), 0); const transferIn = transfers.filter((x) => memberId !== null && x.to_member_id === memberId).reduce((sum, x) => sum + Number(x.amount), 0); const transferOut = transfers.filter((x) => memberId !== null && x.from_member_id === memberId).reduce((sum, x) => sum + Number(x.amount), 0); const assets = summary?.assets ?? accounts.reduce((sum, x) => sum + Number(x.current_balance), 0)
+  const columns = useMemo(() => [{ title: '发生时间', dataIndex: 'occurred_at', width: 150 }, { title: '类型', render: (_: unknown, x: TransactionResponse) => x.type === 'INCOME' ? '收入' : '支出' }, { title: '分类', render: (_: unknown, x: TransactionResponse) => x.category_name ?? '未分类' }, { title: '账户', render: (_: unknown, x: TransactionResponse) => x.account_name ?? '未知账户' }, { title: '金额', align: 'right' as const, render: (_: unknown, x: TransactionResponse) => signed(x.type, x.amount) }], [])
+  return <div className="page"><div className="page-heading"><div><Typography.Title level={2}>首页</Typography.Title><Typography.Text>个人视图，查看所选日期的实际收支、转账和账户余额。</Typography.Text></div><Space direction="vertical" align="end"><HomeScopeToggle /><Space><DatePicker value={dayjs(date)} onChange={(v) => v && setDate(v.format('YYYY-MM-DD'))} allowClear={false} /><Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/transactions?create=1')}>记一笔</Button></Space></Space></div>{error && <Alert type="error" showIcon message={error} style={{ marginBottom: 16 }} />}{loading && <Skeleton active paragraph={{ rows: 2 }} />}<Row gutter={[16, 16]} className="summary-grid"><Col xs={24} sm={12} xl={6}><Card className="summary-card summary-card--income"><Statistic title="当日收入" value={income} formatter={(v) => money(Number(v))} prefix={<ArrowUpOutlined />} /></Card></Col><Col xs={24} sm={12} xl={6}><Card className="summary-card summary-card--expense"><Statistic title="当日支出" value={expense} formatter={(v) => money(Number(v))} prefix={<ArrowDownOutlined />} /></Card></Col><Col xs={24} sm={12} xl={6}><Card className="summary-card"><Statistic title="当日转账" value={transferIn + transferOut} formatter={(v) => money(Number(v))} prefix={<SwapOutlined />} /><span className="summary-card__hint">转入 {money(transferIn)} · 转出 {money(transferOut)}</span></Card></Col><Col xs={24} sm={12} xl={6}><Card className="summary-card"><Statistic title="个人资产" value={assets} formatter={(v) => money(Number(v))} prefix={<WalletOutlined />} /></Card></Col></Row><Row gutter={[16, 16]} className="dashboard-row"><Col xs={24} lg={15}><Card className="data-card" title={`${date} 收支明细`} extra={<Button type="link" onClick={() => navigate('/transactions')}>查看全部</Button>}>{items.length ? <Table rowKey="id" columns={columns} dataSource={items} pagination={{ pageSize: 10 }} scroll={{ x: 680 }} /> : <Empty description="当天没有个人流水" />}</Card></Col><Col xs={24} lg={9}><Card className="data-card" title="实际账户余额">{accounts.length ? <Space direction="vertical" className="full-width">{accounts.map((account) => <div className="report-category-row" key={account.id}><span><WalletOutlined />{account.name}</span><strong>{money(Number(account.current_balance))}</strong></div>)}</Space> : <Empty description="暂无个人账户" />}</Card></Col></Row></div>
 }

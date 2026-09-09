@@ -15,7 +15,7 @@ def parse_file(file_bytes: bytes, filename: str) -> list[dict]:
     ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
     if ext == "csv":
         return _parse_csv(file_bytes)
-    elif ext in ("xls", "xlsx"):
+    elif ext == "xlsx":
         return _parse_xlsx(file_bytes)
     else:
         raise BadRequestError(f"不支持的文件格式: .{ext}")

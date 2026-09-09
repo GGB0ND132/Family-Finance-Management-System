@@ -12,6 +12,17 @@ from app.core.exceptions import ConflictError, ResourceNotFoundError
 from app.modules.categories.models import Category
 from app.modules.categories.repository import CategoryRepository
 
+DEFAULT_CATEGORIES = [("餐饮", "EXPENSE", "🍜", "#E07A5F"), ("住宿", "EXPENSE", "⌂", "#D8956A"), ("交通", "EXPENSE", "🚗", "#5B8FF9"), ("住房", "EXPENSE", "▦", "#F6BD16"), ("购物", "EXPENSE", "◇", "#F08BB4"), ("娱乐", "EXPENSE", "♪", "#9270CA"), ("医疗", "EXPENSE", "+", "#FF7875"), ("借出", "EXPENSE", "↑", "#73C0DE"), ("还款", "EXPENSE", "↻", "#8C8C8C"), ("借入", "INCOME", "↓", "#4E9F6E"), ("收款", "INCOME", "●", "#52C41A"), ("工资", "INCOME", "¥", "#1677FF"), ("奖金", "INCOME", "✦", "#FA8C16")]
+
+def ensure_default_categories(db: Session, family_id: int) -> list[Category]:
+    repo = CategoryRepository(db)
+    existing = repo.list_by_family(family_id, include_deleted=True)
+    names = {(item.name, item.type) for item in existing}
+    created = [repo.create(Category(family_id=family_id, name=name, type=type_, icon=icon, color=color)) for name, type_, icon, color in DEFAULT_CATEGORIES if (name, type_) not in names]
+    if created:
+        db.commit()
+    return existing + created
+
 
 def create_category(
     db: Session,

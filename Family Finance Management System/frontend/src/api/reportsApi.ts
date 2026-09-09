@@ -1,8 +1,13 @@
 import { apiClient } from './client'
+import type { ApiResponse, ReportCategoryPoint, ReportMemberPoint, ReportSummaryResponse, ReportTrendPoint } from './contracts'
 
 export const reportApi = {
-  summary: (params: { family_id?: string; month: string; scope: 'personal' | 'family'; member_id?: string }) => apiClient.get('/reports/summary', { params }),
-  trend: (params: { family_id?: string; from: string; to: string; scope: 'personal' | 'family'; member_id?: string }) => apiClient.get('/reports/trend', { params }),
-  byCategory: (params: { family_id?: string; month: string; scope: 'personal' | 'family'; member_id?: string }) => apiClient.get('/reports/by-category', { params }),
-  byMember: (params: { family_id?: string; month: string; scope: 'family'; member_id?: string }) => apiClient.get('/reports/by-member', { params }),
+  personalSummary: (params: { family_id: number; from_date: string; to_date: string }) => apiClient.get<ApiResponse<ReportSummaryResponse>>('/reports/personal/summary', { params }),
+  personalDaily: (params: { family_id: number; date: string }) => apiClient.get<ApiResponse<ReportSummaryResponse>>('/reports/personal/daily', { params }),
+  personalTrend: (params: { family_id: number; from_month: string; to_month: string }) => apiClient.get<ApiResponse<ReportTrendPoint[]>>('/reports/personal/trend', { params }),
+  personalByCategory: (params: { family_id: number; month: string }) => apiClient.get<ApiResponse<ReportCategoryPoint[]>>('/reports/personal/by-category', { params }),
+  familySummary: (params: { family_id: number; month: string }) => apiClient.get<ApiResponse<ReportSummaryResponse>>('/reports/family/summary', { params }),
+  familyTrend: (params: { family_id: number; from_month: string; to_month: string }) => apiClient.get<ApiResponse<ReportTrendPoint[]>>('/reports/family/trend', { params }),
+  familyByCategory: (params: { family_id: number; month: string }) => apiClient.get<ApiResponse<ReportCategoryPoint[]>>('/reports/family/by-category', { params }),
+  familyByMember: (params: { family_id: number; month: string }) => apiClient.get<ApiResponse<ReportMemberPoint[]>>('/reports/family/by-member', { params }),
 }

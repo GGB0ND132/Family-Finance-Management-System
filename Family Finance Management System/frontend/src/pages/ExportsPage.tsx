@@ -1,90 +1,13 @@
-import { DownloadOutlined } from "@ant-design/icons";
-import {
-  Button,
-  Card,
-  DatePicker,
-  Select,
-  Segmented,
-  Space,
-  Typography,
-  message,
-} from "antd";
-import { useState } from "react";
-import { useFinanceStore } from "../stores/financeStore";
-import { ScopeToggle } from "../components/ScopeToggle";
-import { useDataScope } from "../hooks/useDataScope";
-import { currentUserId, formatDateTime } from "../data/financeData";
+import { DownloadOutlined } from '@ant-design/icons'
+import { Button, Card, DatePicker, Select, Segmented, Space, Typography, message } from 'antd'
+import { useState } from 'react'
+import { transactionApi, downloadBlob } from '../api/transactionsApi'
+import { ScopeToggle } from '../components/ScopeToggle'
+import { useDataScope } from '../hooks/useDataScope'
+import { useAuthStore } from '../stores/authStore'
+
 export function ExportsPage() {
-  const [format, setFormat] = useState<"CSV" | "XLSX">("CSV");
-  const [api, holder] = message.useMessage();
-  const { transactions } = useFinanceStore();
-  const [scope] = useDataScope();
-  const [range, setRange] = useState<[string, string] | undefined>();
-  const [type, setType] = useState<"INCOME" | "EXPENSE" | undefined>();
-  const download = () => {
-    if (format === "XLSX") {
-      api.info(
-        "演示模式：将调用后端 /api/v1/exports/transactions?format=xlsx 生成 Blob",
-      );
-      return;
-    }
-    const filtered = transactions.filter((transaction) =>
-      (scope === 'family' || transaction.beneficiaryMemberId === currentUserId) &&
-      (!type || transaction.type === type) &&
-      (!range || (transaction.occurredAt.slice(0, 10) >= range[0] && transaction.occurredAt.slice(0, 10) <= range[1])),
-    );
-    const header = "date,type,amount,remark\n";
-    const body = filtered
-      .map((t) => `${formatDateTime(t.occurredAt)},${t.type},${t.amount},${t.remark}`)
-      .join("\n");
-    const blob = new Blob([header + body], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "family-transactions.csv";
-    a.click();
-    URL.revokeObjectURL(url);
-    api.success("CSV 已下载");
-  };
-  return (
-    <div className="page">
-      {holder}
-      <div className="page-heading">
-        <div>
-          <Typography.Title level={2}>数据导出</Typography.Title>
-          <Typography.Text>
-            按筛选条件导出收支流水，CSV 可直接下载，XLSX 由后端生成。
-          </Typography.Text>
-        </div>
-      </div>
-      <Card className="data-card" title="导出条件">
-        <Space wrap>
-          <DatePicker.RangePicker onChange={(dates) => setRange(dates?.[0] && dates?.[1] ? [dates[0].format("YYYY-MM-DD"), dates[1].format("YYYY-MM-DD")] : undefined)} />
-          <ScopeToggle /><DatePicker.RangePicker onChange={(dates) => setRange(dates?.[0] && dates?.[1] ? [dates[0].format("YYYY-MM-DD"), dates[1].format("YYYY-MM-DD")] : undefined)} />
-          <Select
-            allowClear
-            value={type}
-            onChange={setType}
-            placeholder="类型"
-            options={[
-              { value: "INCOME", label: "收入" },
-              { value: "EXPENSE", label: "支出" },
-            ]}
-            style={{ width: 150 }}
-          />
-          <Segmented
-            value={format}
-            onChange={(v) => setFormat(v as "CSV" | "XLSX")}
-            options={[
-              { value: "CSV", label: "CSV" },
-              { value: "XLSX", label: "XLSX" },
-            ]}
-          />
-          <Button type="primary" icon={<DownloadOutlined />} onClick={download}>
-            导出 {format}
-          </Button>
-        </Space>
-      </Card>
-    </div>
-  );
+  const familyId = useAuthStore(s => s.familyId); const [scope] = useDataScope(); const [format, setFormat] = useState<'csv' | 'xlsx'>('csv'); const [type, setType] = useState<'INCOME' | 'EXPENSE'>(); const [range, setRange] = useState<[string, string]>(); const [api, holder] = message.useMessage(); const [loading, setLoading] = useState(false)
+  const download = async () => { if (!familyId) return; setLoading(true); try { const response = await transactionApi.export({ family_id: familyId, scope, type, from: range?.[0], to: range?.[1], format }); await downloadBlob(response, `transactions-export.${format}`); api.success(`${format.toUpperCase()} 已下载`) } catch { api.error('导出失败，请检查筛选条件') } finally { setLoading(false) } }
+  return <div className="page">{holder}<div className="page-heading"><div><Typography.Title level={2}>数据导出</Typography.Title><Typography.Text>按范围、日期和类型导出收支流水。</Typography.Text></div></div><Card className="data-card" title="导出条件"><Space wrap><DatePicker.RangePicker onChange={dates => setRange(dates?.[0] && dates?.[1] ? [dates[0].format('YYYY-MM-DD'), dates[1].add(1, 'day').format('YYYY-MM-DDTHH:mm:ssZ')] : undefined)} /><ScopeToggle /><Select allowClear value={type} onChange={setType} placeholder="类型" options={[{ value: 'INCOME', label: '收入' }, { value: 'EXPENSE', label: '支出' }]} style={{ width: 130 }} /><Segmented value={format} onChange={v => setFormat(v as 'csv' | 'xlsx')} options={[{ value: 'csv', label: 'CSV' }, { value: 'xlsx', label: 'XLSX' }]} /><Button type="primary" icon={<DownloadOutlined />} loading={loading} onClick={download}>导出 {format.toUpperCase()}</Button></Space></Card></div>
 }

@@ -7,6 +7,7 @@ import app.modules.users.models  # noqa: F401
 import app.modules.families.models  # noqa: F401
 import app.modules.accounts.models  # noqa: F401
 import app.modules.categories.models  # noqa: F401
+import app.modules.budgets.models  # noqa: F401
 import app.modules.transactions.models  # noqa: F401
 import app.modules.transfers.models  # noqa: F401
 import app.modules.imports.models  # noqa: F401

@@ -1,8 +1,7 @@
 import { apiClient } from './client'
-
-export interface BudgetExecution { category_id: string; budget_amount: number; used_amount: number; remaining_amount: number; usage_rate: number; warning_level: 'NORMAL' | 'WARNING' | 'OVER' }
+import type { ApiResponse, BudgetResponse } from './contracts'
 export const budgetApi = {
-  get: (month: string, params: { family_id?: string; scope: 'personal' | 'family'; member_id?: string }) => apiClient.get<BudgetExecution[]>(`/budgets/${month}`, { params }),
-  save: (month: string, payload: { family_id: string; scope: 'personal' | 'family'; member_id?: string; total_amount: number; items: Array<{ category_id: string; amount: number }> }) => apiClient.put(`/budgets/${month}`, payload),
-  copyFromPrevious: (month: string, payload: { family_id?: string; scope: 'personal' | 'family'; member_id?: string }) => apiClient.post(`/budgets/${month}/copy-from-previous`, payload),
+  get: (month: string, params: { family_id: number; scope: 'personal' | 'family' }) => apiClient.get<ApiResponse<BudgetResponse>>(`/budgets/${month}`, { params }),
+  save: (month: string, payload: { family_id: number; scope: 'personal' | 'family'; total_amount: string; categories: Array<{ category_id: number; amount: string }> }) => apiClient.put<ApiResponse<BudgetResponse>>(`/budgets/${month}`, payload),
+  copyFromPrevious: (month: string, payload: { family_id: number; scope: 'personal' | 'family' }) => apiClient.post<ApiResponse<BudgetResponse>>(`/budgets/${month}/copy-from-previous`, payload),
 }

@@ -85,6 +85,7 @@ def list_members(family_id: int, user: CurrentUser, db: DbSession):
             user_id=member.user_id,
             username=user_obj.username,
             nickname=user_obj.nickname,
+            avatar=user_obj.avatar,
             role=member.role,
             joined_at=member.joined_at,
         ).model_dump()
@@ -148,6 +149,7 @@ def update_member(family_id: int, member_id: int, payload: UpdateMemberRoleReque
             user_id=updated.user_id,
             username=user_obj.username,
             nickname=user_obj.nickname,
+            avatar=user_obj.avatar,
             role=updated.role,
             joined_at=updated.joined_at,
         ).model_dump(),

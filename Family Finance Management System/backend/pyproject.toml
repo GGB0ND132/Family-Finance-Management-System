@@ -1,8 +1,7 @@
 [project]
 name = "backend"
 version = "0.1.0"
-description = "Add your description here"
-readme = "README.md"
+description = "家庭收支管理系统后端服务"
 requires-python = ">=3.11"
 dependencies = [
     "alembic>=1.19.1",
@@ -22,17 +21,3 @@ dependencies = [
 [[tool.uv.index]]
 url = "https://pypi.tuna.tsinghua.edu.cn/simple"
 default = true
-
-[dependency-groups]
-dev = [
-    "httpx>=0.28.1",
-    "mypy>=2.3.1",
-    "pytest>=9.1.1",
-    "pytest-asyncio>=1.4.0",
-    "pytest-cov>=7.1.0",
-    "ruff>=0.16.5",
-]
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-pythonpath = ["."]

@@ -42,6 +42,7 @@ async def preview(
         account_id,
         user.id,
         field_mapping,
+        scope=scope,
     )
     return ok(data=result)
 

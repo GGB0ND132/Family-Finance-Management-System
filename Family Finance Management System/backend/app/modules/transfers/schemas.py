@@ -43,3 +43,4 @@ class TransferOut(BaseModel):
     from_member_nickname: str | None = None
     to_member_nickname: str | None = None
     recorder_nickname: str | None = None
+    status: str = "CONFIRMED"

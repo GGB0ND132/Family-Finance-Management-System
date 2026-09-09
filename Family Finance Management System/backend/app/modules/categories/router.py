@@ -20,6 +20,7 @@ from app.modules.categories.schemas import (
 from app.modules.categories.service import (
     create_category,
     delete_category,
+    ensure_default_categories,
     get_category,
     update_category,
 )
@@ -27,6 +28,11 @@ from app.modules.families.models import FamilyMember
 from app.modules.users.models import User
 
 router = APIRouter(prefix="/categories", tags=["分类"])
+
+
+def _category_out(category) -> dict:
+    """将 ORM 分类转换为可序列化的统一响应对象。"""
+    return CategoryOut.model_validate(category).model_dump()
 
 
 @router.get("", summary="查询分类列表")
@@ -41,10 +47,11 @@ def list_categories(
 ):
     """查询可用或历史分类。成员权限即可访问。"""
     repo = CategoryRepository(db)
+    ensure_default_categories(db, family_id)
     categories = repo.list_by_family(
         family_id, type_=type, include_deleted=include_deleted
     )
-    return ok(data=PageData(items=categories, page=page, page_size=page_size, total=len(categories)))
+    return ok(data=PageData(items=[_category_out(category) for category in categories], page=page, page_size=page_size, total=len(categories)))
 
 
 @router.post("", summary="新增分类", status_code=201)
@@ -71,7 +78,7 @@ def post_category(
         color=payload.color,
     )
     db.commit()
-    return ok(data=category, message="分类创建成功")
+    return ok(data=_category_out(category), message="分类创建成功")
 
 
 @router.patch("/{category_id}", summary="编辑分类")
@@ -94,7 +101,7 @@ def patch_category(
 
     category = update_category(db, category_id, **payload.model_dump(exclude_none=True))
     db.commit()
-    return ok(data=category)
+    return ok(data=_category_out(category))
 
 
 @router.delete("/{category_id}", status_code=204)

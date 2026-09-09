@@ -8,6 +8,8 @@ export const categoryApi = {
     family_id: number
     type?: CategoryType
     include_deleted?: boolean
+    page?: number
+    page_size?: number
   }) =>
     apiClient.get<ApiResponse<PageData<CategoryResponse>>>('/categories', {
       params,

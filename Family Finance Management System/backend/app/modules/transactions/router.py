@@ -17,6 +17,7 @@ from app.modules.transactions.service import (
     list_transactions,
     parse_occurred_at,
     update_transaction,
+    confirm_transaction,
 )
 
 router = APIRouter(prefix="/transactions", tags=["流水"])
@@ -115,3 +116,9 @@ def api_update_transaction(
 @router.delete("/{tx_id}", summary="删除流水", status_code=204)
 def api_delete_transaction(tx_id: int, db: DbSession, user: CurrentUser):
     delete_transaction(db, user, tx_id)
+
+
+@router.post("/{tx_id}/confirm", summary="资金归属人确认流水修改")
+def api_confirm_transaction(tx_id: int, db: DbSession, user: CurrentUser):
+    tx = confirm_transaction(db, user, tx_id)
+    return ok(data=_build_out(db, tx), message="流水修改已确认")
